@@ -23,13 +23,14 @@
         pkgs = import nixpkgs {inherit system;};
 
         shellPackages = with pkgs; [
+        heaptrack
         ];
 
         flakeboxLib = flakebox.lib.${system} {
           config = {
             just.enable = false;
             convco.enable = false;
-            github.ci.workflows.flakebox-flakehub-publish.enable = false;
+            github.ci.enable = false;
             git.commit-msg.enable = false;
             git.commit-template.enable = false;
             git.pre-commit.enable = false;
@@ -42,7 +43,9 @@
         buildPaths = [
           "Cargo.toml"
           "Cargo.lock"
-          "src"
+          "sov"
+          "sov_cli"
+          ".cargo"
         ];
 
         buildInputs = with pkgs; [

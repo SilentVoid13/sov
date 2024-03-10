@@ -160,11 +160,11 @@
         "systems": "systems_4"
       },
       "locked": {
-        "lastModified": 1709590484,
-        "narHash": "sha256-d2nVkExaLBFUDGCr+BOGVGLpguu0QbNixRX2/yE50/I=",
+        "lastModified": 1710086644,
+        "narHash": "sha256-XGA3yUjG0ERkiT2ZZ5eDSYNrmdsXn5K8vXKdtniFcJs=",
         "owner": "rustshop",
         "repo": "flakebox",
-        "rev": "54a6daa911a1f38eda1e30b924bf36d2fae41dcf",
+        "rev": "86bc0386b44cb49eff15a974f4a0ca28ffcafabb",
         "type": "github"
       },
       "original": {
