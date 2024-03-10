@@ -1,6 +1,6 @@
 mod args;
 
-use args::{SovArgs, SovCmd};
+use args::{ListCommand, SovArgs, SovCmd};
 
 use sov::Sov;
 
@@ -15,7 +15,12 @@ pub fn main() -> Result<()> {
     match args.cmd {
         SovCmd::Index => sov.index()?,
         SovCmd::List { cmd } => match cmd {
-            //ListCommand::Tags => sov.list_tags()?,
+            ListCommand::Tags => {
+                let tags = sov.list_tags()?;
+                for tag in tags {
+                    println!("{}", tag);
+                }
+            },
             //ListCommand::Orphans => sov.list_orphans()?,
             _ => {}
         },

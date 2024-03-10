@@ -55,4 +55,10 @@ impl Sov {
         self.db.insert_notes(&notes)?;
         Ok(())
     }
+
+    pub fn list_tags(&self) -> Result<Vec<String>> {
+        // TODO: display and sort by count
+        let unique_tags = self.db.get_unique_tags()?;
+        Ok(unique_tags)
+    }
 }

@@ -70,4 +70,15 @@ impl SovDb {
 
         Ok(())
     }
+
+    pub fn get_unique_tags(&self) -> Result<Vec<String>> {
+        let mut stmt = self.db.prepare("SELECT DISTINCT tag_id FROM tag")?;
+        let rows = stmt
+            .query_map([], |row| row.get(0))?;
+        let mut tags = Vec::new();
+        for row in rows {
+            tags.push(row?);
+        }
+        Ok(tags)
+    }
 }
