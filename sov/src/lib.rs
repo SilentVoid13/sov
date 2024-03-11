@@ -1,10 +1,13 @@
+pub mod config;
 mod db;
 pub mod error;
 pub mod note;
 
-use std::{os::unix::fs::MetadataExt, path::PathBuf};
+use std::os::unix::fs::MetadataExt;
+use std::path::PathBuf;
 
-use chrono::{DateTime, FixedOffset};
+use chrono::DateTime;
+use config::SovConfig;
 use db::SovDb;
 use error::{Result, SovError};
 use note::SovNote;
@@ -15,31 +18,9 @@ pub struct Sov {
     db: SovDb,
 }
 
-pub struct SovConfig {
-    pub last_update: DateTime<FixedOffset>,
-    pub db_path: PathBuf,
-    pub notes_path: PathBuf,
-}
-
 impl Sov {
-    pub const MIN_DATE: &'static str = "1900-01-01T00:00:00+00:00";
-
     pub fn new() -> Result<Self> {
-        // TODO: config file
-        let last_update_f = PathBuf::from(".last_update");
-        let last_update = if !last_update_f.exists() {
-            std::fs::write(".last_update", Self::MIN_DATE)?;
-            Self::MIN_DATE.to_string()
-        } else {
-            std::fs::read_to_string(".last_update")?.trim().to_string()
-        };
-        let last_update = DateTime::parse_from_rfc3339(&last_update)?;
-
-        let config = SovConfig {
-            last_update,
-            db_path: "sov.db3".into(),
-            notes_path: "/home/silent/quark".into(),
-        };
+        let config = SovConfig::load()?;
         let sov_db = SovDb::new(&config.db_path)?;
 
         let sov = Sov { config, db: sov_db };
@@ -53,16 +34,10 @@ impl Sov {
         Ok(())
     }
 
-    pub fn update_last_update(&self) -> Result<()> {
-        let now = chrono::offset::Utc::now();
-        std::fs::write(".last_update", now.to_rfc3339())?;
-        Ok(())
-    }
-
     pub fn index(&self) -> Result<()> {
         let mut notes = Vec::new();
 
-        let walker = WalkDir::new(&self.config.notes_path).into_iter();
+        let walker = WalkDir::new(&self.config.toml.notes_dir).into_iter();
         for entry in walker.filter_entry(|e| {
             e.path().is_dir()
                 || (e.path().is_file() && e.path().extension().map(|s| s == "md").unwrap_or(false))
@@ -75,7 +50,8 @@ impl Sov {
 
             // Do not re-index notes that have not been modified
             let metadata = entry.metadata()?;
-            let ctime = DateTime::from_timestamp(metadata.ctime(), metadata.ctime_nsec() as u32).ok_or(SovError::InvalidTime)?;
+            let ctime = DateTime::from_timestamp(metadata.ctime(), metadata.ctime_nsec() as u32)
+                .ok_or(SovError::InvalidTime)?;
             if ctime < self.config.last_update {
                 continue;
             }
@@ -95,7 +71,7 @@ impl Sov {
             notes.push(note);
         }
         self.db.insert_notes(&notes)?;
-        self.update_last_update()?;
+        self.config.update_last_update()?;
 
         Ok(())
     }

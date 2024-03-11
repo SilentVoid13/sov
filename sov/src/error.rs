@@ -24,4 +24,12 @@ pub enum SovError {
     Chrono(#[from] chrono::ParseError),
     #[error("file time error")]
     InvalidTime,
+    #[error("no config dir")]
+    NoConfigDir,
+    #[error("toml deserialize error: {0}")]
+    TomlDe(#[from] toml::de::Error),
+    #[error("toml serialize error: {0}")]
+    TomlSer(#[from] toml::ser::Error),
+    #[error("no notes dir, please set `notes_dir` in sov.toml")]
+    NoNotesDir,
 }

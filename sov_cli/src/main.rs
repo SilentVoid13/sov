@@ -1,9 +1,10 @@
 mod args;
 
-use args::{ListCommand, SovArgs, SovCmd};
 use clap::Parser;
 use color_eyre::Result;
 use sov::Sov;
+
+use crate::args::{ListCommand, SovArgs, SovCmd};
 
 pub fn main() -> Result<()> {
     color_eyre::install()?;
@@ -25,7 +26,7 @@ pub fn main() -> Result<()> {
         SovCmd::Resolve { note } => {
             let path = sov.resolve_note(&note)?;
             dbg!(path);
-        },
+        }
         _ => {}
     };
 
