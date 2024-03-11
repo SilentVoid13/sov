@@ -39,8 +39,17 @@ impl Sov {
 
         let walker = WalkDir::new(&self.config.toml.notes_dir).into_iter();
         for entry in walker.filter_entry(|e| {
-            e.path().is_dir()
-                || (e.path().is_file() && e.path().extension().map(|s| s == "md").unwrap_or(false))
+            let p = e.path();
+            if self.config.toml.ignore_dirs.contains(&p.to_path_buf()) {
+                return false;
+            }
+            if p.is_file() && p.extension().map(|s| s == "md").unwrap_or(false)  {
+                return true;
+            }
+            if p.is_dir() {
+                return true;
+            }
+            false
         }) {
             let entry = entry?;
             // Skip directories

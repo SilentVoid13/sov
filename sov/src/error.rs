@@ -32,4 +32,6 @@ pub enum SovError {
     TomlSer(#[from] toml::ser::Error),
     #[error("no notes dir, please set `notes_dir` in sov.toml")]
     NoNotesDir,
+    #[error("invalid notes dir: {0}")]
+    InvalidNotesDir(PathBuf),
 }

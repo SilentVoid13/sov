@@ -19,6 +19,7 @@ pub struct SovConfigToml {
     pub notes_dir: PathBuf,
     pub daily_notes: PathBuf,
     pub templates: PathBuf,
+    pub ignore_dirs: Vec<PathBuf>,
 }
 
 impl SovConfig {
@@ -48,7 +49,7 @@ impl SovConfig {
         let db_path = config_dir.join(Self::DB_FILE);
 
         let toml_path = config_dir.join("sov.toml");
-        let toml = if toml_path.exists() {
+        let mut toml = if toml_path.exists() {
             let toml_content = std::fs::read_to_string(&toml_path)?;
             let toml: SovConfigToml = toml::from_str(&toml_content)?;
             toml
@@ -60,6 +61,21 @@ impl SovConfig {
 
         if toml.notes_dir.as_os_str().is_empty() {
             return Err(SovError::NoNotesDir);
+        }
+        if !toml.notes_dir.is_absolute() || !toml.notes_dir.exists() {
+            return Err(SovError::InvalidNotesDir(toml.notes_dir));
+        }
+        // convert relative paths to absolute
+        for p in toml.ignore_dirs.iter_mut() {
+            if p.is_relative() {
+                *p = toml.notes_dir.join(&p);
+            }
+        }
+        if toml.daily_notes.is_relative() {
+            toml.daily_notes = toml.notes_dir.join(&toml.daily_notes);
+        }
+        if toml.templates.is_relative() {
+            toml.templates = toml.notes_dir.join(&toml.templates);
         }
 
         Ok(Self {
