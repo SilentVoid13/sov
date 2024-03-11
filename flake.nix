@@ -23,7 +23,8 @@
         pkgs = import nixpkgs {inherit system;};
 
         shellPackages = with pkgs; [
-        heaptrack
+          heaptrack
+          zk
         ];
 
         flakeboxLib = flakebox.lib.${system} {

@@ -14,8 +14,14 @@ pub enum SovError {
     Walkdir(#[from] walkdir::Error),
     #[error("yaml error: {0}")]
     Yaml(#[from] serde_yaml::Error),
-    #[error("invalid note id: {0}")]
-    InvalidNoteId(PathBuf),
-    #[error("invalid link in file {0}: {1}")]
-    InvalidLink(String, String),
+    #[error("note id not found: {0}")]
+    NoteIdNotFound(String),
+    #[error("invalid link: {0}")]
+    InvalidLink(String),
+    #[error("invalid path: {0}")]
+    InvalidPath(PathBuf),
+    #[error("chrono error: {0}")]
+    Chrono(#[from] chrono::ParseError),
+    #[error("file time error")]
+    InvalidTime,
 }

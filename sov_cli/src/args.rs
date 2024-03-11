@@ -14,6 +14,9 @@ pub enum SovCmd {
         #[command(subcommand)]
         cmd: ListCommand,
     },
+    Resolve {
+        note: String,
+    },
     Edit,
     Search,
 }

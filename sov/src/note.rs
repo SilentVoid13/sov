@@ -6,8 +6,10 @@ use crate::error::{Result, SovError};
 
 pub struct SovNote {
     pub id: String,
-    pub links: Vec<String>,
+    pub name: String,
+    pub path: PathBuf,
     pub yaml: YamlMetadata,
+    pub links: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -17,33 +19,37 @@ pub struct YamlMetadata {
 }
 
 impl SovNote {
-    pub fn extract_note_id(filename: &str) -> Option<String> {
-        let id = filename.split(" - ").last()?;
-        if id.len() != 12 {
-            return None;
-        }
-        if !id.chars().all(|c| c.is_digit(10)) {
-            return None;
-        }
-        Some(id.to_string())
+    pub fn new(path: PathBuf, id: String, name: String) -> Result<Self> {
+        let content = std::fs::read_to_string(&path)?;
+        let yaml = SovNote::parse_yaml(&content)?;
+        let links = SovNote::parse_links(&content)?;
+
+        Ok(Self {
+            id,
+            name,
+            path,
+            yaml,
+            links,
+        })
     }
 
-    pub fn from_file(path: &PathBuf, note_id: String) -> Result<Self> {
-        let content = std::fs::read_to_string(path)?;
-
-        let yaml: YamlMetadata = match content.split("---").nth(1) {
+    pub fn parse_yaml(s: &str) -> Result<YamlMetadata> {
+        let yaml: YamlMetadata = match s.split("---").nth(1) {
             Some(metadata) => serde_yaml::from_str(metadata)?,
             None => YamlMetadata {
                 aliases: Vec::new(),
                 tags: Vec::new(),
             },
         };
+        Ok(yaml)
+    }
 
-        let mut chars = content.chars().peekable();
+    pub fn parse_links(s: &str) -> Result<Vec<String>> {
+        let mut chars = s.chars().peekable();
         let mut is_escaped = false;
         let mut in_code_block = false;
-
         let mut links = Vec::new();
+
         while let Some(c) = chars.next() {
             match c {
                 '\\' => is_escaped = true,
@@ -54,13 +60,11 @@ impl SovNote {
                     if let Some('[') = chars.next() {
                         let s: String = chars.by_ref().take_while(|c| *c != ']').collect();
                         if chars.next() != Some(']') {
-                            return Err(SovError::InvalidLink(path.display().to_string(), s));
+                            return Err(SovError::InvalidLink(s));
                         }
                         // TODO: handle links with no ID (i.e. dead links)
-                        let Some(link_id) = Self::extract_note_id(&s) else {
+                        let Some((link_id, _)) = Self::extract_note_id(&s) else {
                             continue;
-                            //return Err(SovError::InvalidLink(path.display().
-                            // to_string(), s));
                         };
                         links.push(link_id);
                     }
@@ -68,11 +72,17 @@ impl SovNote {
                 _ => is_escaped = false,
             }
         }
+        Ok(links)
+    }
 
-        Ok(Self {
-            id: note_id.to_string(),
-            yaml,
-            links,
-        })
+    pub fn extract_note_id(s: &str) -> Option<(String, String)> {
+        let (name, id) = s.rsplit_once(" - ")?;
+        if id.len() != 12 {
+            return None;
+        }
+        if !id.chars().all(|c| c.is_digit(10)) {
+            return None;
+        }
+        Some((id.to_string(), name.to_string()))
     }
 }

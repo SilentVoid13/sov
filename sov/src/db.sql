@@ -5,6 +5,8 @@
 -- CREATE SEQUENCE IF NOT EXISTS note_seq;
 CREATE TABLE IF NOT EXISTS note (
     note_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    path TEXT NOT NULL,
 );
 
 ----------------------------------------
