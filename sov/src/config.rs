@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Result, SovError};
@@ -8,7 +8,7 @@ use crate::error::{Result, SovError};
 pub struct SovConfig {
     pub config_dir: PathBuf,
     pub last_update_path: PathBuf,
-    pub last_update: DateTime<FixedOffset>,
+    pub last_update: DateTime<Utc>,
     pub db_path: PathBuf,
     pub toml_path: PathBuf,
     pub toml: SovConfigToml,
@@ -44,7 +44,7 @@ impl SovConfig {
                 .trim()
                 .to_string()
         };
-        let last_update = DateTime::parse_from_rfc3339(&last_update)?;
+        let last_update = DateTime::parse_from_rfc3339(&last_update)?.to_utc();
 
         let db_path = config_dir.join(Self::DB_FILE);
 
@@ -88,9 +88,10 @@ impl SovConfig {
         })
     }
 
-    pub fn update_last_update(&self) -> Result<()> {
+    pub fn update_last_update(&mut self) -> Result<()> {
         let now = chrono::offset::Utc::now();
         std::fs::write(&self.last_update_path, now.to_rfc3339())?;
+        self.last_update = now;
         Ok(())
     }
 }

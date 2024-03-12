@@ -3,14 +3,22 @@ mod args;
 use clap::Parser;
 use color_eyre::Result;
 use sov::Sov;
+use tracing_subscriber::prelude::*;
+use tracing::Level;
 
 use crate::args::{ListCommand, SovArgs, SovCmd};
 
 pub fn main() -> Result<()> {
     color_eyre::install()?;
     let args = SovArgs::parse();
+    // Setup logging
+    tracing_subscriber::fmt()
+        .with_max_level(Level::INFO)
+        .with_target(true)
+        .finish()
+        .init();
 
-    let sov = Sov::new()?;
+    let mut sov = Sov::new()?;
 
     match args.cmd {
         SovCmd::Index => sov.index()?,

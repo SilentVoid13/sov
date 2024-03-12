@@ -3,7 +3,7 @@ mod db;
 pub mod error;
 pub mod note;
 
-use std::os::unix::fs::MetadataExt;
+use std::{collections::HashSet, os::unix::fs::MetadataExt};
 use std::path::PathBuf;
 
 use chrono::DateTime;
@@ -11,6 +11,7 @@ use config::SovConfig;
 use db::SovDb;
 use error::{Result, SovError};
 use note::SovNote;
+use tracing::info;
 use walkdir::WalkDir;
 
 pub struct Sov {
@@ -23,21 +24,23 @@ impl Sov {
         let config = SovConfig::load()?;
         let sov_db = SovDb::new(&config.db_path)?;
 
-        let sov = Sov { config, db: sov_db };
+        let mut sov = Sov { config, db: sov_db };
         sov.init()?;
         Ok(sov)
     }
 
-    pub fn init(&self) -> Result<()> {
+    pub fn init(&mut self) -> Result<()> {
         self.db.init()?;
         self.index()?;
         Ok(())
     }
 
-    pub fn index(&self) -> Result<()> {
+    pub fn index(&mut self) -> Result<()> {
         let mut notes = Vec::new();
 
         let walker = WalkDir::new(&self.config.toml.notes_dir).into_iter();
+        let mut fs_paths = HashSet::new();
+
         for entry in walker.filter_entry(|e| {
             let p = e.path();
             if self.config.toml.ignore_dirs.contains(&p.to_path_buf()) {
@@ -57,15 +60,6 @@ impl Sov {
                 continue;
             }
 
-            // Do not re-index notes that have not been modified
-            let metadata = entry.metadata()?;
-            let ctime = DateTime::from_timestamp(metadata.ctime(), metadata.ctime_nsec() as u32)
-                .ok_or(SovError::InvalidTime)?;
-            if ctime < self.config.last_update {
-                continue;
-            }
-            println!("Indexing {:?} ...", entry.path());
-
             let path = entry.path().to_path_buf();
             let Some(filename) = path.file_stem() else {
                 continue;
@@ -73,22 +67,43 @@ impl Sov {
             let Some(filename) = filename.to_str() else {
                 continue;
             };
-            let Some((note_id, note_name)) = SovNote::extract_note_id(&filename) else {
+
+            fs_paths.insert(entry.path().to_path_buf());
+
+            // Do not re-index notes that have not been modified
+            let metadata = entry.metadata()?;
+            let ctime = DateTime::from_timestamp(metadata.ctime(), metadata.ctime_nsec() as u32)
+                .ok_or(SovError::InvalidTime)?;
+            if ctime < self.config.last_update {
                 continue;
-            };
-            let note = SovNote::new(path, note_id, note_name)?;
+            }
+            info!("Indexing new note: {:?} ...", entry.path());
+
+            let filename = filename.to_string();
+            let note = SovNote::new(path, filename)?;
             notes.push(note);
         }
+
+        // Insert new notes
+
         self.db.insert_notes(&notes)?;
         self.config.update_last_update()?;
+
+        // Clean up DB
+
+        let db_paths = self.db.get_all_note_paths()?;
+        let dead_notes = db_paths.difference(&fs_paths);
+        for note in dead_notes {
+            info!("Deleting dead note: {:?}", note);
+            self.db.delete_note_by_path(note)?;
+        }
+        self.db.clean_dead_tags()?;
 
         Ok(())
     }
 
     pub fn resolve_note(&self, note: &str) -> Result<PathBuf> {
-        let (id, _) =
-            SovNote::extract_note_id(note).ok_or(SovError::NoteIdNotFound(note.into()))?;
-        let note_path = self.db.get_note_by_id(&id)?;
+        let note_path = self.db.get_note_by_filename(&note)?;
         Ok(note_path)
     }
 

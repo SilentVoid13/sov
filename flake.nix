@@ -50,7 +50,7 @@
         ];
 
         buildInputs = with pkgs; [
-          duckdb
+          sqlite
         ];
 
         nativeBuildInputs = with pkgs; [

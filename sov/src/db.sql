@@ -2,21 +2,19 @@
 -- note
 ----------------------------------------
 
--- CREATE SEQUENCE IF NOT EXISTS note_seq;
 CREATE TABLE IF NOT EXISTS note (
-    note_id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    path TEXT NOT NULL,
+    note_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    path TEXT NOT NULL
 );
 
 ----------------------------------------
 -- link
 ----------------------------------------
 
--- CREATE SEQUENCE IF NOT EXISTS link_seq;
 CREATE TABLE IF NOT EXISTS link (
     src_note TEXT NOT NULL REFERENCES note(note_id),
-    dst_note TEXT NOT NULL REFERENCES note(note_id),
+    dst_note TEXT NOT NULL,
     PRIMARY KEY(src_note, dst_note)
 );
 
@@ -24,18 +22,35 @@ CREATE TABLE IF NOT EXISTS link (
 -- tag
 ----------------------------------------
 
--- CREATE SEQUENCE IF NOT EXISTS tag_seq;
 CREATE TABLE IF NOT EXISTS tag (
-    tag_id TEXT PRIMARY KEY,
-    note_id TEXT NOT NULL REFERENCES note(note_id),
+    tag_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tag_note (
+    tag_id INTEGER NOT NULL REFERENCES tag(tag_id),
+    note_id INTEGER NOT NULL REFERENCES note(note_id),
+    PRIMARY KEY(tag_id, note_id)
 );
 
 ----------------------------------------
 -- alias
 ----------------------------------------
 
--- CREATE SEQUENCE IF NOT EXISTS alias_seq;
 CREATE TABLE IF NOT EXISTS alias (
-    alias_id TEXT PRIMARY KEY,
+    alias_id TEXT NOT NULL,
     note_id TEXT NOT NULL REFERENCES note(note_id),
+    PRIMARY KEY(alias_id, note_id)
 );
+
+
+----------------------------------------
+-- TRIGGERS
+----------------------------------------
+
+CREATE TRIGGER IF NOT EXISTS remove_dead_note_metadata BEFORE DELETE ON note
+BEGIN
+    DELETE FROM link WHERE src_note = OLD.note_id;
+    DELETE FROM tag_note WHERE note_id = OLD.note_id;
+    DELETE FROM alias WHERE note_id = OLD.note_id;
+END;
