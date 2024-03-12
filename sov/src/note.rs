@@ -33,7 +33,7 @@ impl SovNote {
     }
 
     pub fn parse_yaml(s: &str) -> Result<YamlMetadata> {
-        let yaml: YamlMetadata = match s.split("---").nth(1) {
+        let yaml: YamlMetadata = match s.split("---").nth(1).map(|s| s.split("---").nth(0)).flatten() {
             Some(metadata) => serde_yaml::from_str(metadata)?,
             None => YamlMetadata {
                 aliases: None,
@@ -52,9 +52,9 @@ impl SovNote {
         while let Some(c) = chars.next() {
             match c {
                 '\\' => is_escaped = true,
-                // TODO: this is a hack that tries to handle inline code blocks
-                // TODO: handle multiline code blocks
-                '`' if !is_escaped => in_code_block = !in_code_block,
+                // TODO: handle code blocks
+                // this is a hack that tries to handle inline code blocks (not working)
+                //'`' if !is_escaped => in_code_block = !in_code_block,
                 '[' if !is_escaped && !in_code_block => {
                     if let Some('[') = chars.next() {
                         let s: String = chars.by_ref().take_while(|c| *c != ']').collect();
@@ -62,8 +62,10 @@ impl SovNote {
                             Some((link, _)) => link.to_string(),
                             None => s,
                         };
+                        // TODO: should we return an error or continue?
                         if chars.next() != Some(']') {
-                            return Err(SovError::InvalidLink(link));
+                            continue;
+                            //return Err(SovError::InvalidLink(link));
                         }
                         links.push(link);
                     }

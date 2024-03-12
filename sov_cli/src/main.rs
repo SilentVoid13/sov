@@ -1,9 +1,10 @@
 mod args;
 
 use clap::Parser;
+use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use sov::Sov;
-use tracing::Level;
+use tracing::{info, Level};
 use tracing_subscriber::prelude::*;
 
 use crate::args::{ListCommand, SovArgs, SovCmd};
@@ -29,7 +30,22 @@ pub fn main() -> Result<()> {
                     println!("{}", tag);
                 }
             }
-            ListCommand::Orphans => {}
+            ListCommand::Orphans => {
+                let orphans = sov.list_orphans()?;
+                for orphan in orphans {
+                    println!("{}", orphan.to_str().ok_or(eyre!("path error"))?);
+                }
+            }
+            ListCommand::DeadLinks => {
+                let res = sov.list_dead_links()?;
+                for (path, dead_link) in res {
+                    println!(
+                        "{}: {}",
+                        path.to_str().ok_or(eyre!("path error"))?,
+                        dead_link
+                    );
+                }
+            }
         },
         SovCmd::Resolve { note } => {
             let path = sov.resolve_note(&note)?;

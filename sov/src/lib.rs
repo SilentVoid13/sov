@@ -112,4 +112,14 @@ impl Sov {
         let unique_tags = self.db.get_unique_tags()?;
         Ok(unique_tags)
     }
+
+    pub fn list_orphans(&self) -> Result<Vec<PathBuf>> {
+        let orphans = self.db.get_orphaned_notes()?;
+        Ok(orphans)
+    }
+
+    pub fn list_dead_links(&self) -> Result<Vec<(PathBuf, String)>> {
+        let dead_links = self.db.get_dead_links()?;
+        Ok(dead_links)
+    }
 }

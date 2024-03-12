@@ -24,5 +24,8 @@ pub enum SovCmd {
 #[derive(Subcommand, Debug)]
 pub enum ListCommand {
     Tags,
+    /// Orphans are notes that are not linked to any other note
     Orphans,
+    /// Dead links are notes that are linked to, but do not exist
+    DeadLinks
 }
