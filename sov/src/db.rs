@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use rusqlite::{params, Connection, OptionalExtension};
-use tracing::info;
 
 use crate::error::{Result, SovError};
 use crate::SovNote;

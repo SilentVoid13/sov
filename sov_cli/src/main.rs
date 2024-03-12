@@ -3,8 +3,8 @@ mod args;
 use clap::Parser;
 use color_eyre::Result;
 use sov::Sov;
-use tracing_subscriber::prelude::*;
 use tracing::Level;
+use tracing_subscriber::prelude::*;
 
 use crate::args::{ListCommand, SovArgs, SovCmd};
 

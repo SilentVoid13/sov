@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
@@ -60,7 +60,7 @@ impl SovNote {
                         let s: String = chars.by_ref().take_while(|c| *c != ']').collect();
                         let link = match s.split_once('|') {
                             Some((link, _)) => link.to_string(),
-                            None => s
+                            None => s,
                         };
                         if chars.next() != Some(']') {
                             return Err(SovError::InvalidLink(link));
