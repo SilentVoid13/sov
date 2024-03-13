@@ -111,14 +111,13 @@ impl SovDb {
         Ok(tags)
     }
 
-    pub fn get_note_by_filename(&self, filename: &str) -> Result<PathBuf> {
+    pub fn get_note_by_filename(&self, filename: &str) -> Result<Option<PathBuf>> {
         let mut stmt = self
             .db
             .prepare("SELECT path FROM note WHERE filename = ?")?;
         let p = params![filename];
         // TODO: handle multiple rows
-        let path: String = stmt.query_row(p, |r| r.get(0))?;
-        let path = PathBuf::from(path);
+        let path = stmt.query_row(p, |r| r.get(0).map(|p: String| PathBuf::from(p))).optional()?;
         Ok(path)
     }
 

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -17,7 +19,11 @@ pub enum SovCmd {
     Resolve {
         note: String,
     },
-    Edit,
+    Rename {
+        path: PathBuf,
+        new_filename: String,
+    },
+    Daily,
     Search,
 }
 

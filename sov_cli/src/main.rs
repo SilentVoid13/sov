@@ -4,7 +4,7 @@ use clap::Parser;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use sov::Sov;
-use tracing::{info, Level};
+use tracing::Level;
 use tracing_subscriber::prelude::*;
 
 use crate::args::{ListCommand, SovArgs, SovCmd};
@@ -50,6 +50,10 @@ pub fn main() -> Result<()> {
         SovCmd::Resolve { note } => {
             let path = sov.resolve_note(&note)?;
             dbg!(path);
+        }
+        SovCmd::Daily => {
+            let note = sov.daily()?;
+            dbg!(note);
         }
         _ => {}
     };

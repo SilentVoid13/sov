@@ -17,8 +17,8 @@ pub struct SovConfig {
 #[derive(Default, Serialize, Deserialize)]
 pub struct SovConfigToml {
     pub notes_dir: PathBuf,
-    pub daily_notes: PathBuf,
-    pub templates: PathBuf,
+    pub daily_notes_dir: PathBuf,
+    pub templates_dir: PathBuf,
     pub ignore_dirs: Vec<PathBuf>,
 }
 
@@ -71,11 +71,11 @@ impl SovConfig {
                 *p = toml.notes_dir.join(&p);
             }
         }
-        if toml.daily_notes.is_relative() {
-            toml.daily_notes = toml.notes_dir.join(&toml.daily_notes);
+        if toml.daily_notes_dir.is_relative() {
+            toml.daily_notes_dir = toml.notes_dir.join(&toml.daily_notes_dir);
         }
-        if toml.templates.is_relative() {
-            toml.templates = toml.notes_dir.join(&toml.templates);
+        if toml.templates_dir.is_relative() {
+            toml.templates_dir = toml.notes_dir.join(&toml.templates_dir);
         }
 
         Ok(Self {

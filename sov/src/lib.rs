@@ -102,7 +102,7 @@ impl Sov {
         Ok(())
     }
 
-    pub fn resolve_note(&self, note: &str) -> Result<PathBuf> {
+    pub fn resolve_note(&self, note: &str) -> Result<Option<PathBuf>> {
         let note_path = self.db.get_note_by_filename(&note)?;
         Ok(note_path)
     }
@@ -121,5 +121,21 @@ impl Sov {
     pub fn list_dead_links(&self) -> Result<Vec<(PathBuf, String)>> {
         let dead_links = self.db.get_dead_links()?;
         Ok(dead_links)
+    }
+
+    pub fn daily(&self) -> Result<PathBuf> {
+        // TODO: add day offset to create notes for previous/next days?
+        let now = chrono::Local::now();
+        // TODO: add support for custom date format
+        let date = now.format("%Y-%m-%d").to_string();
+        date.
+        if let Some(path) = self.db.get_note_by_filename(&date)? {
+            return Ok(path);
+        }
+        let path = self.config.toml.daily_notes_dir.join(&date).with_extension("md");
+        info!("Creating new daily note: {:?}", path);
+        // TODO: add template support
+        std::fs::File::create(&path)?;
+        Ok(path)
     }
 }
