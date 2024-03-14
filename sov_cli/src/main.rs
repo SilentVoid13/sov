@@ -56,7 +56,6 @@ pub fn main() -> Result<()> {
         }
         SovCmd::Daily => {
             let note = sov.daily()?;
-            dbg!(note);
         }
         SovCmd::Lsp => unreachable!(),
         _ => {}

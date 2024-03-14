@@ -26,6 +26,13 @@ impl LanguageServer for SovLanguageServer {
                     TextDocumentSyncKind::FULL,
                 )),
                 definition_provider: Some(OneOf::Left(true)),
+                completion_provider: Some(CompletionOptions {
+                    resolve_provider: Some(true),
+                    trigger_characters: Some(vec!["[".to_string()]),
+                    all_commit_characters: None,
+                    work_done_progress_options: Default::default(),
+                    completion_item: None,
+                }),
                 ..Default::default()
             },
         };
@@ -64,6 +71,9 @@ impl LanguageServer for SovLanguageServer {
     }
 
     async fn did_save(&self, _: DidSaveTextDocumentParams) {
+        // TODO: no unwrap?
+        self.sov.lock().unwrap().index().unwrap();
+
         self.client
             .log_message(MessageType::ERROR, "file saved!")
             .await;
@@ -81,13 +91,9 @@ impl LanguageServer for SovLanguageServer {
     ) -> Result<Option<GotoDefinitionResponse>> {
         let res = async {
             let uri = params.text_document_position_params.text_document.uri;
-            self.client.log_message(MessageType::ERROR, &uri).await;
             let rope = self.document_map.get(uri.as_str())?;
             let position = params.text_document_position_params.position;
             let line = rope.get_line(position.line as usize)?;
-            self.client
-                .log_message(MessageType::ERROR, format!("line: {}", line))
-                .await;
 
             let links = SovNote::parse_links(line.as_str()?).ok()?;
             // get closest link to cursor
@@ -111,6 +117,87 @@ impl LanguageServer for SovLanguageServer {
         .await;
         Ok(res)
     }
+
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        self.client
+            .log_message(MessageType::ERROR, "completion triggered!")
+            .await;
+
+        let Some(context) = params.context else {
+            self.client
+                .log_message(MessageType::ERROR, "no context, returning")
+                .await;
+            return Ok(None);
+        };
+        self.client
+            .log_message(
+                MessageType::ERROR,
+                format!("context: {:?}", context).as_str(),
+            )
+            .await;
+        if context.trigger_kind == CompletionTriggerKind::INVOKED {
+            self.client
+                .log_message(MessageType::ERROR, "invoked, returning.")
+                .await;
+            return Ok(None);
+        }
+
+        //let completions = || -> Option<Vec<CompletionItem>> {
+        let completions = async {
+            let rope = self.document_map.get(&uri.to_string())?;
+            let tch = context.trigger_character?;
+            match tch.as_str() {
+                "[" => {
+                    if rope.len_chars() <= 1 {
+                        return None;
+                    }
+                    let char = rope.try_line_to_char(position.line as usize).ok()?;
+                    let offset = char + position.character as usize;
+                    let prev_char = rope.char(offset - 2);
+                    if prev_char != '[' {
+                        return None;
+                    }
+                    let notes = self.sov.lock().unwrap().list_note_names().ok()?;
+                    let mut ret = Vec::new();
+                    for note in notes {
+                        let completion = CompletionItem {
+                            label: note,
+                            kind: Some(CompletionItemKind::FILE),
+                            commit_characters: Some(vec![" ".to_string()]),
+                            ..Default::default()
+                        };
+                        ret.push(completion);
+                    }
+                    Some(ret)
+                }
+                "#" => {
+                    let tags = self.sov.lock().unwrap().list_tags().ok()?;
+                    let mut ret = Vec::new();
+                    for tag in tags {
+                        let completion = CompletionItem {
+                            label: tag,
+                            kind: Some(CompletionItemKind::TEXT),
+                            ..Default::default()
+                        };
+                        ret.push(completion);
+                    }
+                    Some(ret)
+                }
+                _ => return None,
+            }
+        }
+        .await;
+        Ok(completions.map(|c| CompletionResponse::Array(c)))
+    }
+
+    /*
+    async fn completion_resolve(&self, params: CompletionItem) -> Result<CompletionItem> {
+        todo!()
+    }
+    */
 }
 
 impl SovLanguageServer {

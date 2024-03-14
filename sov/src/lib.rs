@@ -112,6 +112,11 @@ impl Sov {
         Ok(note_path)
     }
 
+    pub fn list_note_names(&self) -> Result<Vec<String>> {
+        let notes = self.db.get_all_note_names()?;
+        Ok(notes.into_iter().collect())
+    }
+
     pub fn list_tags(&self) -> Result<Vec<String>> {
         // TODO: display and sort by count
         let unique_tags = self.db.get_unique_tags()?;

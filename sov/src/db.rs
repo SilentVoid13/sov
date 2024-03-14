@@ -132,6 +132,16 @@ impl SovDb {
         Ok(paths)
     }
 
+    pub fn get_all_note_names(&self) -> Result<Vec<String>> {
+        let mut stmt = self.db.prepare("SELECT filename FROM note")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        let mut names = Vec::new();
+        for row in rows {
+            names.push(row?);
+        }
+        Ok(names)
+    }
+
     pub fn get_orphaned_notes(&self) -> Result<Vec<PathBuf>> {
         let sql = "SELECT path FROM note WHERE filename NOT IN (SELECT dst_note FROM link)";
         let mut stmt = self.db.prepare(sql)?;
