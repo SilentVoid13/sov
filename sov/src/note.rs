@@ -2,13 +2,24 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use crate::error::{Result, SovError};
+use crate::error::Result;
 
 pub struct SovNote {
     pub filename: String,
     pub path: PathBuf,
     pub yaml: YamlMetadata,
-    pub links: Vec<String>,
+    pub links: Vec<Link>,
+}
+
+pub struct Link {
+    pub value: String,
+    pub start: Position,
+    pub end: Position,
+}
+
+pub struct Position {
+    pub line: u64,
+    pub ch: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +44,12 @@ impl SovNote {
     }
 
     pub fn parse_yaml(s: &str) -> Result<YamlMetadata> {
-        let yaml: YamlMetadata = match s.split("---").nth(1).map(|s| s.split("---").nth(0)).flatten() {
+        let yaml: YamlMetadata = match s
+            .split("---")
+            .nth(1)
+            .map(|s| s.split("---").nth(0))
+            .flatten()
+        {
             Some(metadata) => serde_yaml::from_str(metadata)?,
             None => YamlMetadata {
                 aliases: None,
@@ -43,31 +59,50 @@ impl SovNote {
         Ok(yaml)
     }
 
-    pub fn parse_links(s: &str) -> Result<Vec<String>> {
-        let mut chars = s.chars().peekable();
-        let mut is_escaped = false;
-        let mut in_code_block = false;
+    pub fn parse_links(s: &str) -> Result<Vec<Link>> {
+        let mut chars = s.chars().peekable().enumerate();
         let mut links = Vec::new();
 
-        while let Some(c) = chars.next() {
+        let mut cur_line = 0;
+        let mut cur_allch = 0;
+        let mut is_escaped = false;
+
+        while let Some((i, c)) = chars.next() {
             match c {
                 '\\' => is_escaped = true,
-                // TODO: handle code blocks
-                // this is a hack that tries to handle inline code blocks (not working)
-                //'`' if !is_escaped => in_code_block = !in_code_block,
-                '[' if !is_escaped && !in_code_block => {
-                    if let Some('[') = chars.next() {
-                        let s: String = chars.by_ref().take_while(|c| *c != ']').collect();
+                '\n' => {
+                    cur_line += 1;
+                    cur_allch = i;
+                }
+                '[' if !is_escaped => {
+                    let start_ch = i - cur_allch;
+                    if let Some((_, '[')) = chars.next() {
+                        let s: String = chars
+                            .by_ref()
+                            .take_while(|(_, c)| *c != ']')
+                            .map(|(_, c)| c)
+                            .collect();
                         let link = match s.split_once('|') {
                             Some((link, _)) => link.to_string(),
                             None => s,
                         };
                         // TODO: should we return an error or continue?
-                        if chars.next() != Some(']') {
+                        let Some((last_i, ']')) = chars.next() else {
                             continue;
                             //return Err(SovError::InvalidLink(link));
-                        }
-                        links.push(link);
+                        };
+                        let end_ch = last_i - cur_allch;
+                        links.push(Link {
+                            value: link,
+                            start: Position {
+                                line: cur_line,
+                                ch: start_ch as u64,
+                            },
+                            end: Position {
+                                line: cur_line,
+                                ch: end_ch as u64,
+                            },
+                        });
                     }
                 }
                 _ => is_escaped = false,

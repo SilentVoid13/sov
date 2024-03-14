@@ -25,6 +25,7 @@ pub enum SovCmd {
     },
     Daily,
     Search,
+    Lsp,
 }
 
 #[derive(Subcommand, Debug)]

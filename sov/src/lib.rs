@@ -1,16 +1,21 @@
 pub mod config;
 mod db;
 pub mod error;
+pub mod lsp;
 pub mod note;
 
-use std::{collections::HashSet, os::unix::fs::MetadataExt};
+use std::collections::HashSet;
+use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use chrono::DateTime;
 use config::SovConfig;
 use db::SovDb;
 use error::{Result, SovError};
+use lsp::SovLanguageServer;
 use note::SovNote;
+use tower_lsp::{LspService, Server};
 use tracing::info;
 use walkdir::WalkDir;
 
@@ -46,7 +51,7 @@ impl Sov {
             if self.config.toml.ignore_dirs.contains(&p.to_path_buf()) {
                 return false;
             }
-            if p.is_file() && p.extension().map(|s| s == "md").unwrap_or(false)  {
+            if p.is_file() && p.extension().map(|s| s == "md").unwrap_or(false) {
                 return true;
             }
             if p.is_dir() {
@@ -128,14 +133,33 @@ impl Sov {
         let now = chrono::Local::now();
         // TODO: add support for custom date format
         let date = now.format("%Y-%m-%d").to_string();
-        date.
         if let Some(path) = self.db.get_note_by_filename(&date)? {
             return Ok(path);
         }
-        let path = self.config.toml.daily_notes_dir.join(&date).with_extension("md");
+        let path = self
+            .config
+            .toml
+            .daily_notes_dir
+            .join(&date)
+            .with_extension("md");
         info!("Creating new daily note: {:?}", path);
         // TODO: add template support
         std::fs::File::create(&path)?;
         Ok(path)
     }
+}
+
+#[tokio::main]
+pub async fn start_lsp() -> Result<()> {
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
+
+    let sov = Sov::new()?;
+    let (service, socket) = LspService::new(|client| SovLanguageServer {
+        client,
+        sov: Arc::new(Mutex::new(sov)),
+        document_map: Default::default(),
+    });
+    Server::new(stdin, stdout, socket).serve(service).await;
+    Ok(())
 }

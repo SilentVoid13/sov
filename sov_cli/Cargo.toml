@@ -3,6 +3,10 @@ name = "sov_cli"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "sov"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4.5.2", features = ["derive"] }
 color-eyre = "0.6.2"

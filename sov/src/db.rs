@@ -93,7 +93,7 @@ impl SovDb {
                 .db
                 .prepare("INSERT OR REPLACE INTO link (src_note, dst_note) VALUES (?, ?)")?;
             for link in &note.links {
-                let p = params![id, link];
+                let p = params![id, link.value];
                 stmt.execute(p)?;
             }
         }
