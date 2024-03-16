@@ -22,81 +22,81 @@ impl SovDb {
         Ok(())
     }
 
-    pub fn insert_notes(&self, notes: &[SovNote]) -> Result<()> {
-        for note in notes {
-            let path = note
-                .path
-                .to_str()
-                .ok_or(SovError::InvalidPath(note.path.clone()))?;
+    pub fn insert_notes(&mut self, notes: &[SovNote]) -> Result<()> {
+        let tx = self.db.transaction()?;
+        {
+            // Preparing statements outside of the loop is more efficient
+            let mut ins_note =
+                tx.prepare("INSERT INTO note (filename, path) VALUES (?, ?) RETURNING(note_id)")?;
+            let mut ins_alias =
+                tx.prepare("INSERT INTO alias (alias_id, note_id) VALUES (?, ?)")?;
+            let mut ins_tag = tx.prepare("INSERT INTO tag (name) VALUES (?) RETURNING(tag_id)")?;
+            let mut ins_tag_note =
+                tx.prepare("INSERT INTO tag_note (tag_id, note_id) VALUES (?, ?)")?;
+            // multiple links to the same note in the same file is possible
+            let mut ins_link =
+                tx.prepare("INSERT OR REPLACE INTO link (src_note, dst_note) VALUES (?, ?)")?;
 
-            let sql = "SELECT note_id FROM note WHERE path = ?";
-            let p = params![path];
-            let id: Option<u64> = self.db.query_row(sql, p, |r| r.get(0)).optional()?;
-            let id = if let Some(id) = id {
-                id
-            } else {
-                let mut stmt = self.db.prepare(
-                    "INSERT INTO note (filename, path) VALUES (?, ?) RETURNING(note_id)",
-                )?;
-                let p = params![note.filename, path,];
-                let id: u64 = stmt.query_row(p, |r| r.get(0))?;
-                id
-            };
+            for note in notes {
+                let path = note
+                    .path
+                    .to_str()
+                    .ok_or(SovError::InvalidPath(note.path.clone()))?;
 
-            // clean up old metadata
-            let sql = "DELETE FROM alias WHERE note_id = ?";
-            let p = params![id];
-            self.db.execute(sql, p)?;
-
-            let sql = "DELETE FROM tag_note WHERE note_id = ?";
-            let p = params![id];
-            self.db.execute(sql, p)?;
-
-            let sql = "DELETE FROM link WHERE src_note = ?";
-            let p = params![id];
-            self.db.execute(sql, p)?;
-
-            // insert new metadata
-            let mut stmt = self
-                .db
-                .prepare("INSERT INTO alias (alias_id, note_id) VALUES (?, ?)")?;
-            if let Some(aliases) = &note.yaml.aliases {
-                for alias in aliases {
-                    let p = params![alias, id];
-                    stmt.execute(p)?;
-                }
-            }
-
-            for tag_name in &note.yaml.tags {
-                let sql = "SELECT tag_id FROM tag WHERE name = ?";
-                let p = params![tag_name];
-                let tag_id: Option<u64> = self.db.query_row(sql, p, |r| r.get(0)).optional()?;
-                let tag_id = if let Some(tag_id) = tag_id {
-                    tag_id
+                let sql = "SELECT note_id FROM note WHERE path = ?";
+                let p = params![path];
+                let id: Option<u64> = tx.query_row(sql, p, |r| r.get(0)).optional()?;
+                let id = if let Some(id) = id {
+                    id
                 } else {
-                    let mut stmt = self
-                        .db
-                        .prepare("INSERT INTO tag (name) VALUES (?) RETURNING(tag_id)")?;
-                    let p = params![tag_name];
-                    let id: u64 = stmt.query_row(p, |r| r.get(0))?;
+                    let p = params![note.filename, path,];
+                    let id: u64 = ins_note.query_row(p, |r| r.get(0))?;
                     id
                 };
-                let mut stmt = self
-                    .db
-                    .prepare("INSERT INTO tag_note (tag_id, note_id) VALUES (?, ?)")?;
-                let p = params![tag_id, id];
-                stmt.execute(p)?;
-            }
 
-            // multiple links to the same note in the same file is possible
-            let mut stmt = self
-                .db
-                .prepare("INSERT OR REPLACE INTO link (src_note, dst_note) VALUES (?, ?)")?;
-            for link in &note.links {
-                let p = params![id, link.value];
-                stmt.execute(p)?;
+                // clean up old metadata
+                let sql = "DELETE FROM alias WHERE note_id = ?";
+                let p = params![id];
+                tx.execute(sql, p)?;
+
+                let sql = "DELETE FROM tag_note WHERE note_id = ?";
+                let p = params![id];
+                tx.execute(sql, p)?;
+
+                let sql = "DELETE FROM link WHERE src_note = ?";
+                let p = params![id];
+                tx.execute(sql, p)?;
+
+                // insert new metadata
+                if let Some(aliases) = &note.yaml.aliases {
+                    for alias in aliases {
+                        let p = params![alias, id];
+                        ins_alias.execute(p)?;
+                    }
+                }
+
+                for tag_name in &note.yaml.tags {
+                    let sql = "SELECT tag_id FROM tag WHERE name = ?";
+                    let p = params![tag_name];
+                    let tag_id: Option<u64> = tx.query_row(sql, p, |r| r.get(0)).optional()?;
+                    let tag_id = if let Some(tag_id) = tag_id {
+                        tag_id
+                    } else {
+                        let p = params![tag_name];
+                        let id: u64 = ins_tag.query_row(p, |r| r.get(0))?;
+                        id
+                    };
+                    let p = params![tag_id, id];
+                    ins_tag_note.execute(p)?;
+                }
+
+                for link in &note.links {
+                    let p = params![id, link.value];
+                    ins_link.execute(p)?;
+                }
             }
         }
+        tx.commit()?;
 
         Ok(())
     }
@@ -117,7 +117,9 @@ impl SovDb {
             .prepare("SELECT path FROM note WHERE filename = ?")?;
         let p = params![filename];
         // TODO: handle multiple rows
-        let path = stmt.query_row(p, |r| r.get(0).map(|p: String| PathBuf::from(p))).optional()?;
+        let path = stmt
+            .query_row(p, |r| r.get(0).map(|p: String| PathBuf::from(p)))
+            .optional()?;
         Ok(path)
     }
 
