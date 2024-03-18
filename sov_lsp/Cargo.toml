@@ -1,0 +1,13 @@
+[package]
+name = "sov_lsp"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.36.0", features = ["full"] }
+dashmap = "5.5.3"
+ropey = "1.6.1"
+tower-lsp = "0.20.0"
+sov = { path = "../sov" }

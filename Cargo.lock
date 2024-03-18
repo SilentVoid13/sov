@@ -954,14 +954,12 @@ name = "sov"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "dashmap",
  "dirs",
  "ropey",
  "rusqlite",
  "serde",
  "serde_yaml",
  "thiserror",
- "tokio",
  "toml",
  "tower-lsp",
  "tracing",
@@ -977,6 +975,17 @@ dependencies = [
  "sov",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "sov_lsp"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "ropey",
+ "sov",
+ "tokio",
+ "tower-lsp",
 ]
 
 [[package]]

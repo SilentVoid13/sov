@@ -12,9 +12,6 @@ use crate::args::{ListCommand, SovArgs, SovCmd};
 pub fn main() -> Result<()> {
     color_eyre::install()?;
     let args = SovArgs::parse();
-    if let SovCmd::Lsp = args.cmd {
-        sov::start_lsp()?;
-    }
 
     // Setup logging
     tracing_subscriber::fmt()
@@ -56,8 +53,8 @@ pub fn main() -> Result<()> {
         }
         SovCmd::Daily => {
             let note = sov.daily()?;
+            dbg!(note);
         }
-        SovCmd::Lsp => unreachable!(),
         _ => {}
     };
 

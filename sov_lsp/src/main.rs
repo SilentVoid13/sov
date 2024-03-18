@@ -6,9 +6,9 @@ use ropey::Rope;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
-
-use crate::note::{Link, SovNote};
-use crate::Sov;
+use tower_lsp::{LspService, Server};
+use sov::note::{Link, SovNote};
+use sov::Sov;
 
 pub struct SovLanguageServer {
     pub client: Client,
@@ -236,4 +236,18 @@ impl SovLanguageServer {
         }
         None
     }
+}
+
+#[tokio::main]
+pub async fn main() -> Result<()> {
+    let stdin = tokio::io::stdin();
+    let stdout = tokio::io::stdout();
+    let sov = Sov::new().unwrap();
+    let (service, socket) = LspService::new(|client| SovLanguageServer {
+        client,
+        sov: Arc::new(Mutex::new(sov)),
+        document_map: Default::default(),
+    });
+    Server::new(stdin, stdout, socket).serve(service).await;
+    Ok(())
 }
