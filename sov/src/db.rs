@@ -174,6 +174,19 @@ impl SovDb {
         Ok(paths)
     }
 
+    pub fn get_backlinks(&self, note: &str) -> Result<Vec<PathBuf>> {
+        let sql =
+            "SELECT path FROM note WHERE note_id IN (SELECT src_note FROM link WHERE dst_note = ?)";
+        let mut stmt = self.db.prepare(sql)?;
+        let p = params![note];
+        let rows = stmt.query_map(p, |row| row.get(0).map(|p: String| PathBuf::from(p)))?;
+        let mut refs = Vec::new();
+        for row in rows {
+            refs.push(row?);
+        }
+        Ok(refs)
+    }
+
     pub fn delete_note_by_path(&self, path: &PathBuf) -> Result<()> {
         let path = path.to_str().ok_or(SovError::InvalidPath(path.clone()))?;
         let sql = "DELETE FROM note WHERE path = ?";

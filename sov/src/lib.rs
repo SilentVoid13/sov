@@ -133,6 +133,11 @@ impl Sov {
         Ok(dead_links)
     }
 
+    pub fn list_backlinks(&self, note: &str) -> Result<Vec<PathBuf>> {
+        let references = self.db.get_backlinks(note)?;
+        Ok(references)
+    }
+
     pub fn daily(&self) -> Result<PathBuf> {
         // TODO: add day offset to create notes for previous/next days?
         let now = chrono::Local::now();

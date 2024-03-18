@@ -7,7 +7,7 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
-use crate::note::SovNote;
+use crate::note::{Link, SovNote};
 use crate::Sov;
 
 pub struct SovLanguageServer {
@@ -25,14 +25,15 @@ impl LanguageServer for SovLanguageServer {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::FULL,
                 )),
-                definition_provider: Some(OneOf::Left(true)),
                 completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(true),
-                    trigger_characters: Some(vec!["[".to_string()]),
-                    all_commit_characters: None,
+                    resolve_provider: Some(false),
+                    trigger_characters: Some(vec!["[".into(), "#".into()]),
                     work_done_progress_options: Default::default(),
+                    all_commit_characters: None,
                     completion_item: None,
                 }),
+                definition_provider: Some(OneOf::Left(true)),
+                references_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
         };
@@ -119,67 +120,37 @@ impl LanguageServer for SovLanguageServer {
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
-        let uri = params.text_document_position.text_document.uri;
-        let position = params.text_document_position.position;
-
         self.client
             .log_message(MessageType::ERROR, "completion triggered!")
             .await;
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
 
-        let Some(context) = params.context else {
-            self.client
-                .log_message(MessageType::ERROR, "no context, returning")
-                .await;
-            return Ok(None);
-        };
-        self.client
-            .log_message(
-                MessageType::ERROR,
-                format!("context: {:?}", context).as_str(),
-            )
-            .await;
-        if context.trigger_kind == CompletionTriggerKind::INVOKED {
-            self.client
-                .log_message(MessageType::ERROR, "invoked, returning.")
-                .await;
-            return Ok(None);
-        }
-
-        //let completions = || -> Option<Vec<CompletionItem>> {
-        let completions = async {
+        let completions = || -> Option<Vec<CompletionItem>> {
             let rope = self.document_map.get(&uri.to_string())?;
-            let tch = context.trigger_character?;
-            match tch.as_str() {
-                "[" => {
-                    if rope.len_chars() <= 1 {
-                        return None;
-                    }
-                    let char = rope.try_line_to_char(position.line as usize).ok()?;
-                    let offset = char + position.character as usize;
-                    let prev_char = rope.char(offset - 2);
-                    if prev_char != '[' {
-                        return None;
-                    }
+            let line = rope.get_line(position.line as usize)?;
+            match &line.as_str()?.as_bytes()[..position.character as usize] {
+                &[.., b'[', b'['] => {
                     let notes = self.sov.lock().unwrap().list_note_names().ok()?;
                     let mut ret = Vec::new();
                     for note in notes {
                         let completion = CompletionItem {
                             label: note,
                             kind: Some(CompletionItemKind::FILE),
-                            commit_characters: Some(vec![" ".to_string()]),
                             ..Default::default()
                         };
                         ret.push(completion);
                     }
                     Some(ret)
                 }
-                "#" => {
+                &[.., b'#'] => {
                     let tags = self.sov.lock().unwrap().list_tags().ok()?;
                     let mut ret = Vec::new();
                     for tag in tags {
+                        let tag = format!("#{}", tag);
                         let completion = CompletionItem {
                             label: tag,
-                            kind: Some(CompletionItemKind::TEXT),
+                            kind: Some(CompletionItemKind::CONSTANT),
                             ..Default::default()
                         };
                         ret.push(completion);
@@ -188,9 +159,12 @@ impl LanguageServer for SovLanguageServer {
                 }
                 _ => return None,
             }
-        }
-        .await;
-        Ok(completions.map(|c| CompletionResponse::Array(c)))
+        }();
+
+        Ok(completions.map(|c| CompletionResponse::List(CompletionList {
+            is_incomplete: false,
+            items: c,
+        })))
     }
 
     /*
@@ -198,6 +172,35 @@ impl LanguageServer for SovLanguageServer {
         todo!()
     }
     */
+
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+        self.client
+            .log_message(MessageType::ERROR, "references triggered!")
+            .await;
+
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        let references = || -> Option<Vec<Location>> {
+            let rope = self.document_map.get(&uri.to_string())?;
+            let line = rope.get_line(position.line as usize)?;
+            let filename = if let Some(link) = Self::link_under_cursor(&position, line.as_str()?) {
+                link.value
+            } else {
+                let path = Self::uri_to_path(&uri).ok()?;
+                path.file_stem()?.to_str()?.to_string()
+            };
+            let mut ret = Vec::new();
+            let backlinks = self.sov.lock().unwrap().list_backlinks(&filename).ok()?;
+            for backlink in backlinks {
+                let uri = Self::path_to_uri(&backlink).ok()?;
+                let location = Location::new(uri, Range::default());
+                ret.push(location);
+            }
+            Some(ret)
+        }();
+        Ok(references)
+    }
 }
 
 impl SovLanguageServer {
@@ -214,5 +217,23 @@ impl SovLanguageServer {
         // TODO
         let uri = Url::from_file_path(path).unwrap();
         Ok(uri)
+    }
+
+    fn uri_to_path(uri: &Url) -> Result<PathBuf> {
+        // TODO
+        let path = uri.to_file_path().unwrap();
+        Ok(path)
+    }
+
+    fn link_under_cursor(position: &Position, line: &str) -> Option<Link> {
+        let links = SovNote::parse_links(line).ok()?;
+        for link in links {
+            if link.start.ch <= position.character as u64
+                && link.end.ch >= position.character as u64
+            {
+                return Some(link);
+            }
+        }
+        None
     }
 }
