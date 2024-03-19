@@ -11,15 +11,11 @@ pub struct SovNote {
     pub links: Vec<Link>,
 }
 
+#[derive(Debug)]
 pub struct Link {
     pub value: String,
-    pub start: Position,
-    pub end: Position,
-}
-
-pub struct Position {
-    pub line: u64,
-    pub ch: u64,
+    pub start: usize,
+    pub end: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,20 +58,13 @@ impl SovNote {
     pub fn parse_links(s: &str) -> Result<Vec<Link>> {
         let mut chars = s.chars().peekable().enumerate();
         let mut links = Vec::new();
-
-        let mut cur_line = 0;
-        let mut cur_allch = 0;
         let mut is_escaped = false;
 
         while let Some((i, c)) = chars.next() {
             match c {
                 '\\' => is_escaped = true,
-                '\n' => {
-                    cur_line += 1;
-                    cur_allch = i;
-                }
                 '[' if !is_escaped => {
-                    let start_ch = i - cur_allch;
+                    let start_off = i;
                     if let Some((_, '[')) = chars.next() {
                         let s: String = chars
                             .by_ref()
@@ -87,21 +76,14 @@ impl SovNote {
                             None => s,
                         };
                         // TODO: should we return an error or continue?
-                        let Some((last_i, ']')) = chars.next() else {
+                        let Some((end_off, ']')) = chars.next() else {
                             continue;
                             //return Err(SovError::InvalidLink(link));
                         };
-                        let end_ch = last_i - cur_allch;
                         links.push(Link {
                             value: link,
-                            start: Position {
-                                line: cur_line,
-                                ch: start_ch as u64,
-                            },
-                            end: Position {
-                                line: cur_line,
-                                ch: end_ch as u64,
-                            },
+                            start: start_off,
+                            end: end_off,
                         });
                     }
                 }

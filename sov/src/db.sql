@@ -14,8 +14,10 @@ CREATE TABLE IF NOT EXISTS note (
 
 CREATE TABLE IF NOT EXISTS link (
     src_note TEXT NOT NULL REFERENCES note(note_id),
-    dst_note TEXT NOT NULL,
-    PRIMARY KEY(src_note, dst_note)
+    link_value TEXT NOT NULL,
+    start INTEGER NOT NULL,
+    end INTEGER NOT NULL,
+    PRIMARY KEY(src_note, link_value)
 );
 
 ----------------------------------------

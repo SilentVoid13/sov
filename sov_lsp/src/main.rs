@@ -3,12 +3,11 @@ use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 use ropey::Rope;
-use tower_lsp::jsonrpc::Result;
-use tower_lsp::lsp_types::*;
-use tower_lsp::{Client, LanguageServer};
-use tower_lsp::{LspService, Server};
 use sov::note::{Link, SovNote};
 use sov::Sov;
+use tower_lsp::jsonrpc::Result;
+use tower_lsp::lsp_types::*;
+use tower_lsp::{Client, LanguageServer, LspService, Server};
 
 pub struct SovLanguageServer {
     pub client: Client,
@@ -71,13 +70,15 @@ impl LanguageServer for SovLanguageServer {
         .await;
     }
 
-    async fn did_save(&self, _: DidSaveTextDocumentParams) {
-        // TODO: no unwrap?
-        self.sov.lock().unwrap().index().unwrap();
-
+    async fn did_save(&self, _params: DidSaveTextDocumentParams) {
         self.client
             .log_message(MessageType::ERROR, "file saved!")
             .await;
+        // refresh metadata
+        self.sov.lock().unwrap().index().unwrap();
+        let uri = _params.text_document.uri;
+        let rope = self.document_map.get(uri.as_str()).unwrap();
+        self.refresh_diagnostics(&uri, &rope).await;
     }
 
     async fn did_close(&self, _: DidCloseTextDocumentParams) {
@@ -95,14 +96,13 @@ impl LanguageServer for SovLanguageServer {
             let rope = self.document_map.get(uri.as_str())?;
             let position = params.text_document_position_params.position;
             let line = rope.get_line(position.line as usize)?;
-
             let links = SovNote::parse_links(line.as_str()?).ok()?;
             // get closest link to cursor
             let link = links.iter().min_by(|l1, l2| {
-                let cmp1 = ((l1.start.ch as i64 - position.character as i64).abs())
-                    .min((l1.end.ch as i64 - position.character as i64).abs());
-                let cmp2 = ((l2.start.ch as i64 - position.character as i64).abs())
-                    .min((l2.end.ch as i64 - position.character as i64).abs());
+                let cmp1 = ((l1.start as i64 - position.character as i64).abs())
+                    .min((l1.end as i64 - position.character as i64).abs());
+                let cmp2 = ((l2.start as i64 - position.character as i64).abs())
+                    .min((l2.end as i64 - position.character as i64).abs());
                 cmp1.cmp(&cmp2)
             })?;
 
@@ -161,17 +161,13 @@ impl LanguageServer for SovLanguageServer {
             }
         }();
 
-        Ok(completions.map(|c| CompletionResponse::List(CompletionList {
-            is_incomplete: false,
-            items: c,
-        })))
+        Ok(completions.map(|c| {
+            CompletionResponse::List(CompletionList {
+                is_incomplete: false,
+                items: c,
+            })
+        }))
     }
-
-    /*
-    async fn completion_resolve(&self, params: CompletionItem) -> Result<CompletionItem> {
-        todo!()
-    }
-    */
 
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         self.client
@@ -191,7 +187,7 @@ impl LanguageServer for SovLanguageServer {
                 path.file_stem()?.to_str()?.to_string()
             };
             let mut ret = Vec::new();
-            let backlinks = self.sov.lock().unwrap().list_backlinks(&filename).ok()?;
+            let backlinks = self.sov.lock().unwrap().resolve_backlinks(&filename).ok()?;
             for backlink in backlinks {
                 let uri = Self::path_to_uri(&backlink).ok()?;
                 let location = Location::new(uri, Range::default());
@@ -209,8 +205,45 @@ impl SovLanguageServer {
             .log_message(MessageType::ERROR, "on_change triggered!")
             .await;
         let rope = ropey::Rope::from_str(&params.text);
-        self.document_map
-            .insert(params.uri.to_string(), rope.clone());
+        self.refresh_diagnostics(&params.uri, &rope).await;
+        let uri = params.uri.to_string();
+        self.document_map.insert(uri, rope);
+    }
+
+    async fn refresh_diagnostics(&self, uri: &Url, rope: &Rope) {
+        let diagnostics = async {
+            let path = Self::uri_to_path(&uri).ok()?;
+            let filename = path.file_stem()?.to_str()?;
+
+            let dead_links = self
+                .sov
+                .lock()
+                .unwrap()
+                .resolve_dead_links(&filename)
+                .ok()?;
+            let mut diagnostics = Vec::new();
+            for dead_link in dead_links {
+                let start_pos = Self::offset_to_position(dead_link.start, rope);
+                let end_pos = Self::offset_to_position(dead_link.end, rope);
+                let diagnostic = Diagnostic {
+                    range: Range {
+                        start: start_pos,
+                        end: end_pos,
+                    },
+                    severity: Some(DiagnosticSeverity::INFORMATION),
+                    message: "Unresolved Reference".into(),
+                    ..Default::default()
+                };
+                diagnostics.push(diagnostic);
+            }
+            Some(diagnostics)
+        }
+        .await;
+        if let Some(diagnostics) = diagnostics {
+            self.client
+                .publish_diagnostics(uri.clone(), diagnostics, None)
+                .await;
+        }
     }
 
     fn path_to_uri(path: &PathBuf) -> Result<Url> {
@@ -228,13 +261,18 @@ impl SovLanguageServer {
     fn link_under_cursor(position: &Position, line: &str) -> Option<Link> {
         let links = SovNote::parse_links(line).ok()?;
         for link in links {
-            if link.start.ch <= position.character as u64
-                && link.end.ch >= position.character as u64
+            if link.start <= position.character as usize && link.end >= position.character as usize
             {
                 return Some(link);
             }
         }
         None
+    }
+
+    fn offset_to_position(offset: usize, rope: &Rope) -> Position {
+        let line = rope.char_to_line(offset);
+        let character = offset - rope.line_to_char(line);
+        Position::new(line as u32, character as u32)
     }
 }
 

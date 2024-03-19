@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::error::{Result, SovError};
+use crate::note::Link;
 use crate::SovNote;
 
 pub struct SovDb {
@@ -34,8 +35,9 @@ impl SovDb {
             let mut ins_tag_note =
                 tx.prepare("INSERT INTO tag_note (tag_id, note_id) VALUES (?, ?)")?;
             // multiple links to the same note in the same file is possible
-            let mut ins_link =
-                tx.prepare("INSERT OR REPLACE INTO link (src_note, dst_note) VALUES (?, ?)")?;
+            let mut ins_link = tx.prepare(
+                "INSERT OR REPLACE INTO link (src_note, link_value, start, end) VALUES (?, ?, ?, ?)",
+            )?;
 
             for note in notes {
                 let path = note
@@ -91,7 +93,7 @@ impl SovDb {
                 }
 
                 for link in &note.links {
-                    let p = params![id, link.value];
+                    let p = params![id, link.value, link.start, link.end,];
                     ins_link.execute(p)?;
                 }
             }
@@ -144,8 +146,8 @@ impl SovDb {
         Ok(names)
     }
 
-    pub fn get_orphaned_notes(&self) -> Result<Vec<PathBuf>> {
-        let sql = "SELECT path FROM note WHERE filename NOT IN (SELECT dst_note FROM link)";
+    pub fn get_all_orphaned_notes(&self) -> Result<Vec<PathBuf>> {
+        let sql = "SELECT path FROM note WHERE filename NOT IN (SELECT link_value FROM link)";
         let mut stmt = self.db.prepare(sql)?;
         let rows = stmt.query_map([], |row| row.get(0))?;
         let mut paths = Vec::new();
@@ -156,11 +158,11 @@ impl SovDb {
         Ok(paths)
     }
 
-    pub fn get_dead_links(&self) -> Result<Vec<(PathBuf, String)>> {
+    pub fn get_all_dead_links(&self) -> Result<Vec<(PathBuf, String)>> {
         let sql = "
-            SELECT path, dst_note FROM note t1
+            SELECT path, link_value FROM note t1
             JOIN link t2 ON t1.note_id = t2.src_note
-            WHERE dst_note NOT IN (
+            WHERE link_value NOT IN (
                 SELECT filename FROM note
             )";
         let mut stmt = self.db.prepare(sql)?;
@@ -174,17 +176,73 @@ impl SovDb {
         Ok(paths)
     }
 
-    pub fn get_backlinks(&self, note: &str) -> Result<Vec<PathBuf>> {
+    pub fn get_note_id_by_filename(&self, filename: &str) -> Result<Option<u64>> {
+        let sql = "SELECT note_id FROM note WHERE filename = ?";
+        let p = params![filename];
+        let id: Option<u64> = self.db.query_row(sql, p, |r| r.get(0)).optional()?;
+        Ok(id)
+    }
+
+    pub fn get_backlinks(&self, link_value: &str) -> Result<Vec<PathBuf>> {
         let sql =
-            "SELECT path FROM note WHERE note_id IN (SELECT src_note FROM link WHERE dst_note = ?)";
+            "SELECT path FROM note WHERE note_id IN (SELECT src_note FROM link WHERE link_value = ?)";
         let mut stmt = self.db.prepare(sql)?;
-        let p = params![note];
+        let p = params![link_value];
         let rows = stmt.query_map(p, |row| row.get(0).map(|p: String| PathBuf::from(p)))?;
         let mut refs = Vec::new();
         for row in rows {
             refs.push(row?);
         }
         Ok(refs)
+    }
+
+    pub fn get_links(&self, filename: &str) -> Result<Vec<Link>> {
+        let mut links = Vec::new();
+        let Some(note_id) = self.get_note_id_by_filename(filename)? else {
+            return Ok(links);
+        };
+        let sql = "SELECT link_value, start, end FROM link WHERE src_note = ?";
+        let p = params![note_id];
+        let mut stmt = self.db.prepare(sql)?;
+        let mut rows = stmt.query(p)?;
+        while let Some(row) = rows.next()? {
+            let link_value = row.get(0)?;
+            let start = row.get(1)?;
+            let end = row.get(2)?;
+            links.push(Link {
+                value: link_value,
+                start,
+                end,
+            });
+        }
+        Ok(links)
+    }
+
+    pub fn get_dead_links(&self, filename: &str) -> Result<Vec<Link>> {
+        let mut links = Vec::new();
+        let Some(note_id) = self.get_note_id_by_filename(filename)? else {
+            return Ok(links);
+        };
+        let sql = "
+            SELECT link_value, start, end FROM link
+            WHERE src_note = ? AND link_value NOT IN (
+                SELECT filename FROM note
+            )";
+
+        let p = params![note_id];
+        let mut stmt = self.db.prepare(sql)?;
+        let mut rows = stmt.query(p)?;
+        while let Some(row) = rows.next()? {
+            let link_value = row.get(0)?;
+            let start = row.get(1)?;
+            let end = row.get(2)?;
+            links.push(Link {
+                value: link_value,
+                start,
+                end,
+            });
+        }
+        Ok(links)
     }
 
     pub fn delete_note_by_path(&self, path: &PathBuf) -> Result<()> {

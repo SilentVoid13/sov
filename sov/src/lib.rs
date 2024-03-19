@@ -11,7 +11,7 @@ use chrono::DateTime;
 use config::SovConfig;
 use db::SovDb;
 use error::{Result, SovError};
-use note::SovNote;
+use note::{Link, SovNote};
 use tracing::info;
 use walkdir::WalkDir;
 
@@ -103,9 +103,24 @@ impl Sov {
         Ok(())
     }
 
-    pub fn resolve_note(&self, note: &str) -> Result<Option<PathBuf>> {
-        let note_path = self.db.get_note_by_filename(&note)?;
+    pub fn resolve_note(&self, filename: &str) -> Result<Option<PathBuf>> {
+        let note_path = self.db.get_note_by_filename(&filename)?;
         Ok(note_path)
+    }
+
+    pub fn resolve_backlinks(&self, filename: &str) -> Result<Vec<PathBuf>> {
+        let references = self.db.get_backlinks(filename)?;
+        Ok(references)
+    }
+
+    pub fn resolve_links(&self, filename: &str) -> Result<Vec<Link>> {
+        let links = self.db.get_links(filename)?;
+        Ok(links)
+    }
+
+    pub fn resolve_dead_links(&self, filename: &str) -> Result<Vec<Link>> {
+        let dead_links = self.db.get_dead_links(filename)?;
+        Ok(dead_links)
     }
 
     pub fn list_note_names(&self) -> Result<Vec<String>> {
@@ -120,18 +135,13 @@ impl Sov {
     }
 
     pub fn list_orphans(&self) -> Result<Vec<PathBuf>> {
-        let orphans = self.db.get_orphaned_notes()?;
+        let orphans = self.db.get_all_orphaned_notes()?;
         Ok(orphans)
     }
 
     pub fn list_dead_links(&self) -> Result<Vec<(PathBuf, String)>> {
-        let dead_links = self.db.get_dead_links()?;
+        let dead_links = self.db.get_all_dead_links()?;
         Ok(dead_links)
-    }
-
-    pub fn list_backlinks(&self, note: &str) -> Result<Vec<PathBuf>> {
-        let references = self.db.get_backlinks(note)?;
-        Ok(references)
     }
 
     pub fn daily(&self) -> Result<PathBuf> {
