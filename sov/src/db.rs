@@ -34,9 +34,8 @@ impl SovDb {
             let mut ins_tag = tx.prepare("INSERT INTO tag (name) VALUES (?) RETURNING(tag_id)")?;
             let mut ins_tag_note =
                 tx.prepare("INSERT INTO tag_note (tag_id, note_id) VALUES (?, ?)")?;
-            // multiple links to the same note in the same file is possible
             let mut ins_link = tx.prepare(
-                "INSERT OR REPLACE INTO link (src_note, link_value, start, end) VALUES (?, ?, ?, ?)",
+                "INSERT INTO link (src_note, link_value, start, end) VALUES (?, ?, ?, ?)",
             )?;
 
             for note in notes {
@@ -146,6 +145,22 @@ impl SovDb {
         Ok(names)
     }
 
+    pub fn get_all_note_aliases(&self) -> Result<Vec<(String, String)>> {
+        let mut stmt = self
+            .db
+            .prepare("SELECT n.filename, alias_id FROM alias JOIN note n USING(note_id)")?;
+        let rows = stmt.query_map([], |row| {
+            let filename: String = row.get(0)?;
+            let alias: String = row.get(1)?;
+            Ok((filename, alias))
+        })?;
+        let mut aliases = Vec::new();
+        for row in rows {
+            aliases.push(row?);
+        }
+        Ok(aliases)
+    }
+
     pub fn get_all_orphaned_notes(&self) -> Result<Vec<PathBuf>> {
         let sql = "SELECT path FROM note WHERE filename NOT IN (SELECT link_value FROM link)";
         let mut stmt = self.db.prepare(sql)?;
@@ -183,17 +198,28 @@ impl SovDb {
         Ok(id)
     }
 
-    pub fn get_backlinks(&self, link_value: &str) -> Result<Vec<PathBuf>> {
-        let sql =
-            "SELECT path FROM note WHERE note_id IN (SELECT src_note FROM link WHERE link_value = ?)";
+    pub fn get_backlinks(&self, link_value: &str) -> Result<Vec<(PathBuf, Link)>> {
+        let sql = "
+            SELECT n.path, l.link_value, l.start, l.end FROM note n
+            JOIN link l ON n.note_id = l.src_note
+            WHERE link_value = ?";
         let mut stmt = self.db.prepare(sql)?;
         let p = params![link_value];
-        let rows = stmt.query_map(p, |row| row.get(0).map(|p: String| PathBuf::from(p)))?;
-        let mut refs = Vec::new();
-        for row in rows {
-            refs.push(row?);
+        let mut rows = stmt.query(p)?;
+        let mut backlinks = Vec::new();
+        while let Some(row) = rows.next()? {
+            let path: String = row.get(0)?;
+            let link_value: String = row.get(1)?;
+            let start: usize = row.get(2)?;
+            let end: usize = row.get(3)?;
+            let link = Link {
+                value: link_value,
+                start,
+                end,
+            };
+            backlinks.push((PathBuf::from(path), link));
         }
-        Ok(refs)
+        Ok(backlinks)
     }
 
     pub fn get_links(&self, filename: &str) -> Result<Vec<Link>> {

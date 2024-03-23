@@ -104,11 +104,11 @@ impl Sov {
     }
 
     pub fn resolve_note(&self, filename: &str) -> Result<Option<PathBuf>> {
-        let note_path = self.db.get_note_by_filename(&filename)?;
+        let note_path = self.db.get_note_by_filename(filename)?;
         Ok(note_path)
     }
 
-    pub fn resolve_backlinks(&self, filename: &str) -> Result<Vec<PathBuf>> {
+    pub fn resolve_backlinks(&self, filename: &str) -> Result<Vec<(PathBuf, Link)>> {
         let references = self.db.get_backlinks(filename)?;
         Ok(references)
     }
@@ -125,7 +125,12 @@ impl Sov {
 
     pub fn list_note_names(&self) -> Result<Vec<String>> {
         let notes = self.db.get_all_note_names()?;
-        Ok(notes.into_iter().collect())
+        Ok(notes)
+    }
+
+    pub fn list_note_aliases(&self) -> Result<Vec<(String, String)>> {
+        let aliases = self.db.get_all_note_aliases()?;
+        Ok(aliases)
     }
 
     pub fn list_tags(&self) -> Result<Vec<String>> {

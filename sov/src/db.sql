@@ -13,11 +13,11 @@ CREATE TABLE IF NOT EXISTS note (
 ----------------------------------------
 
 CREATE TABLE IF NOT EXISTS link (
+    link_id INTEGER PRIMARY KEY AUTOINCREMENT,
     src_note TEXT NOT NULL REFERENCES note(note_id),
     link_value TEXT NOT NULL,
     start INTEGER NOT NULL,
-    end INTEGER NOT NULL,
-    PRIMARY KEY(src_note, link_value)
+    end INTEGER NOT NULL
 );
 
 ----------------------------------------
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS tag_note (
 
 CREATE TABLE IF NOT EXISTS alias (
     alias_id TEXT NOT NULL,
-    note_id TEXT NOT NULL REFERENCES note(note_id),
+    note_id INTEGER REFERENCES note(note_id),
     PRIMARY KEY(alias_id, note_id)
 );
 

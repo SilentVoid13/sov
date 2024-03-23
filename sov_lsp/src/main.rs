@@ -54,21 +54,24 @@ impl LanguageServer for SovLanguageServer {
         self.client
             .log_message(MessageType::ERROR, "file opened!")
             .await;
-        self.on_change(params.text_document).await;
+        let uri = &params.text_document.uri;
+        let text = &params.text_document.text;
+        self.on_change(text, uri).await;
+        let rope = self
+            .document_map
+            .get(params.text_document.uri.as_str())
+            .unwrap();
+        self.refresh_diagnostics(&params.text_document.uri, &rope)
+            .await;
     }
 
     async fn did_change(&self, mut params: DidChangeTextDocumentParams) {
         self.client
             .log_message(MessageType::ERROR, "file opened!")
             .await;
-        self.on_change(TextDocumentItem {
-            uri: params.text_document.uri,
-            text: std::mem::take(&mut params.content_changes[0].text),
-            // TODO: what should i put here?
-            language_id: "".into(),
-            version: params.text_document.version,
-        })
-        .await;
+        let text = std::mem::take(&mut params.content_changes[0].text);
+        let uri = &params.text_document.uri;
+        self.on_change(&text, uri).await;
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
@@ -120,10 +123,12 @@ impl LanguageServer for SovLanguageServer {
                 let finder = LinkFinder::new();
                 let link = finder.links(line.as_str()?).next()?;
 
-                std::process::Command::new("xdg-open")
-                    .arg(link.as_str())
-                    .spawn()
-                    .ok()?;
+                if link.kind() == &LinkKind::Url {
+                    std::process::Command::new("xdg-open")
+                        .arg(link.as_str())
+                        .spawn()
+                        .ok()?;
+                }
                 None
             }
         }
@@ -141,21 +146,37 @@ impl LanguageServer for SovLanguageServer {
         let completions = || -> Option<Vec<CompletionItem>> {
             let rope = self.document_map.get(&uri.to_string())?;
             let line = rope.get_line(position.line as usize)?;
-            match &line.as_str()?.as_bytes()[..position.character as usize] {
-                &[.., b'[', b'['] => {
-                    let notes = self.sov.lock().unwrap().list_note_names().ok()?;
+            match line.as_str()?.as_bytes()[..position.character as usize] {
+                [.., b'[', b'['] => {
                     let mut ret = Vec::new();
-                    for note in notes {
+
+                    let note_filenames = self.sov.lock().unwrap().list_note_names().ok()?;
+                    for filename in note_filenames {
+                        let ins_text = format!("{}]]", filename);
                         let completion = CompletionItem {
-                            label: note,
+                            label: filename,
+                            insert_text: Some(ins_text),
                             kind: Some(CompletionItemKind::FILE),
                             ..Default::default()
                         };
                         ret.push(completion);
                     }
+
+                    let note_aliases = self.sov.lock().unwrap().list_note_aliases().ok()?;
+                    for (filename, alias) in note_aliases {
+                        let ins_text = format!("{}|{}]]", filename, alias);
+                        let completion = CompletionItem {
+                            label: alias,
+                            insert_text: Some(ins_text),
+                            kind: Some(CompletionItemKind::FILE),
+                            ..Default::default()
+                        };
+                        ret.push(completion);
+                    }
+
                     Some(ret)
                 }
-                &[.., b'#'] => {
+                [.., b'#'] => {
                     let tags = self.sov.lock().unwrap().list_tags().ok()?;
                     let mut ret = Vec::new();
                     for tag in tags {
@@ -169,7 +190,7 @@ impl LanguageServer for SovLanguageServer {
                     }
                     Some(ret)
                 }
-                _ => return None,
+                _ => None,
             }
         }();
 
@@ -189,7 +210,7 @@ impl LanguageServer for SovLanguageServer {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
 
-        let references = || -> Option<Vec<Location>> {
+        let references = async {
             let rope = self.document_map.get(&uri.to_string())?;
             let line = rope.get_line(position.line as usize)?;
             let filename = if let Some(link) = Self::link_under_cursor(&position, line.as_str()?) {
@@ -200,39 +221,41 @@ impl LanguageServer for SovLanguageServer {
             };
             let mut ret = Vec::new();
             let backlinks = self.sov.lock().unwrap().resolve_backlinks(&filename).ok()?;
-            for backlink in backlinks {
-                let uri = Self::path_to_uri(&backlink).ok()?;
-                let location = Location::new(uri, Range::default());
+            for (path, link) in backlinks {
+                let uri = Self::path_to_uri(&path).ok()?;
+                // TODO: improve this?
+                let new_rope = ropey::Rope::from_reader(std::fs::File::open(&path).ok()?).ok()?;
+                let start_pos = Self::offset_to_position(link.start, &new_rope);
+                let end_pos = Self::offset_to_position(link.end, &new_rope);
+                let range = Range {
+                    start: start_pos,
+                    end: end_pos,
+                };
+                let location = Location::new(uri, range);
                 ret.push(location);
             }
             Some(ret)
-        }();
+        }.await;
         Ok(references)
     }
 }
 
 impl SovLanguageServer {
-    async fn on_change(&self, params: TextDocumentItem) {
+    async fn on_change(&self, text: &str, uri: &Url) {
         self.client
             .log_message(MessageType::ERROR, "on_change triggered!")
             .await;
-        let rope = ropey::Rope::from_str(&params.text);
-        self.refresh_diagnostics(&params.uri, &rope).await;
-        let uri = params.uri.to_string();
+        let rope = ropey::Rope::from_str(text);
+        let uri = uri.to_string();
         self.document_map.insert(uri, rope);
     }
 
     async fn refresh_diagnostics(&self, uri: &Url, rope: &Rope) {
         let diagnostics = async {
-            let path = Self::uri_to_path(&uri).ok()?;
+            let path = Self::uri_to_path(uri).ok()?;
             let filename = path.file_stem()?.to_str()?;
 
-            let dead_links = self
-                .sov
-                .lock()
-                .unwrap()
-                .resolve_dead_links(&filename)
-                .ok()?;
+            let dead_links = self.sov.lock().unwrap().resolve_dead_links(filename).ok()?;
             let mut diagnostics = Vec::new();
             for dead_link in dead_links {
                 let start_pos = Self::offset_to_position(dead_link.start, rope);
@@ -272,13 +295,9 @@ impl SovLanguageServer {
 
     fn link_under_cursor(position: &Position, line: &str) -> Option<Link> {
         let links = SovNote::parse_links(line).ok()?;
-        for link in links {
-            if link.start <= position.character as usize && link.end >= position.character as usize
-            {
-                return Some(link);
-            }
-        }
-        None
+        links.into_iter().find(|link| {
+            position.character as usize >= link.start && position.character as usize <= link.end
+        })
     }
 
     fn offset_to_position(offset: usize, rope: &Rope) -> Position {
