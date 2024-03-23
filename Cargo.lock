@@ -570,6 +570,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "linkify"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1dfa36d52c581e9ec783a7ce2a5e0143da6237be5811a0b3153fedfdbe9f780"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -982,6 +991,7 @@ name = "sov_lsp"
 version = "0.1.0"
 dependencies = [
  "dashmap",
+ "linkify",
  "ropey",
  "sov",
  "tokio",

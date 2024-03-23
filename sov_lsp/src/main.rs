@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
+use linkify::{LinkFinder, LinkKind};
 use ropey::Rope;
 use sov::note::{Link, SovNote};
 use sov::Sov;
@@ -70,13 +71,13 @@ impl LanguageServer for SovLanguageServer {
         .await;
     }
 
-    async fn did_save(&self, _params: DidSaveTextDocumentParams) {
+    async fn did_save(&self, params: DidSaveTextDocumentParams) {
         self.client
             .log_message(MessageType::ERROR, "file saved!")
             .await;
         // refresh metadata
         self.sov.lock().unwrap().index().unwrap();
-        let uri = _params.text_document.uri;
+        let uri = params.text_document.uri;
         let rope = self.document_map.get(uri.as_str()).unwrap();
         self.refresh_diagnostics(&uri, &rope).await;
     }
@@ -104,16 +105,27 @@ impl LanguageServer for SovLanguageServer {
                 let cmp2 = ((l2.start as i64 - position.character as i64).abs())
                     .min((l2.end as i64 - position.character as i64).abs());
                 cmp1.cmp(&cmp2)
-            })?;
+            });
+            if let Some(link) = link {
+                let sov = self.sov.lock().unwrap();
+                let note_path = sov.resolve_note(&link.value).ok()??;
+                let note_uri = Self::path_to_uri(&note_path).ok()?;
 
-            let sov = self.sov.lock().unwrap();
-            let note_path = sov.resolve_note(&link.value).ok()??;
-            let note_uri = Self::path_to_uri(&note_path).ok()?;
+                let range = Range::default();
+                Some(GotoDefinitionResponse::Scalar(Location::new(
+                    note_uri, range,
+                )))
+            } else {
+                // Try to parse URLs
+                let finder = LinkFinder::new();
+                let link = finder.links(line.as_str()?).next()?;
 
-            let range = Range::default();
-            Some(GotoDefinitionResponse::Scalar(Location::new(
-                note_uri, range,
-            )))
+                std::process::Command::new("xdg-open")
+                    .arg(link.as_str())
+                    .spawn()
+                    .ok()?;
+                None
+            }
         }
         .await;
         Ok(res)

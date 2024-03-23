@@ -11,3 +11,4 @@ dashmap = "5.5.3"
 ropey = "1.6.1"
 tower-lsp = "0.20.0"
 sov = { path = "../sov" }
+linkify = "0.10.0"
