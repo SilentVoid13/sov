@@ -34,6 +34,13 @@ impl LanguageServer for SovLanguageServer {
                 }),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
+                execute_command_provider: Some(ExecuteCommandOptions {
+                    commands: vec![
+                        "sov.index".into(),
+                        "sov.daily".into(),
+                    ],
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
         };
@@ -237,6 +244,31 @@ impl LanguageServer for SovLanguageServer {
             Some(ret)
         }.await;
         Ok(references)
+    }
+
+    async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<serde_json::Value>> {
+        self.client
+            .log_message(MessageType::ERROR, "execute_command triggered!")
+            .await;
+        let command = params.command.as_str();
+        match command {
+            "sov.index" => {
+                // TODO: remove unwrap
+                self.sov.lock().unwrap().index().unwrap();
+                Ok(None)
+            }
+            "sov.daily" => {
+                // TODO: remove unwrap
+                let daily_path = self.sov.lock().unwrap().daily().unwrap();
+                let daily_path = daily_path.to_str().unwrap().to_string();
+                Ok(Some(daily_path.into()))
+            }
+            "sov.list.tags" => {
+                let tags = self.sov.lock().unwrap().list_tags().unwrap();
+                Ok(Some(tags.into()))
+            }
+            _ => Ok(None),
+        }
     }
 }
 
