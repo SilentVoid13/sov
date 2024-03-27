@@ -3,7 +3,7 @@ mod args;
 use clap::Parser;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use sov::Sov;
+use sov_core::Sov;
 use tracing::Level;
 use tracing_subscriber::prelude::*;
 
