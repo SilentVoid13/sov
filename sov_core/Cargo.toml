@@ -1,0 +1,17 @@
+[package]
+name = "sov_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.35"
+dirs = "5.0.1"
+ropey = "1.6.1"
+rusqlite = "0.31.0"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_yaml = "0.9.32"
+thiserror = "1.0.57"
+toml = "0.8.11"
+tower-lsp = "0.20.0"
+tracing = "0.1.40"
+walkdir = "2.5.0"
