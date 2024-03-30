@@ -34,4 +34,8 @@ pub enum SovError {
     NoNotesDir,
     #[error("invalid notes dir: {0}")]
     InvalidNotesDir(PathBuf),
+    #[error("script not found: {0}")]
+    ScriptNotFound(String),
+    #[error("script failed: {0}")]
+    ScriptFailed(String),
 }

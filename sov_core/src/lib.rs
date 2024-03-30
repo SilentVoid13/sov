@@ -20,6 +20,43 @@ pub struct Sov {
     db: SovDb,
 }
 
+#[derive(Debug)]
+pub enum SovFeature {
+    Index,
+    Daily,
+    ListNotes,
+    ListTags,
+    ListOrphans,
+    ListDeadLinks,
+    ListAliases,
+    ListScripts,
+    ResolveNote {
+        note: String,
+    },
+    ResolveLinks {
+        note: String,
+    },
+    ResolveDeadLinks {
+        note: String,
+    },
+    ResolveBacklinks {
+        note: String,
+    },
+    Rename {
+        path: PathBuf,
+        new_filename: String,
+    },
+    ScriptRun {
+        script_name: String,
+        args: Vec<String>,
+    },
+    ScriptCreate {
+        note_name: String,
+        script_name: String,
+        args: Vec<String>,
+    },
+}
+
 impl Sov {
     pub fn new() -> Result<Self> {
         let config = SovConfig::load()?;
@@ -149,6 +186,19 @@ impl Sov {
         Ok(dead_links)
     }
 
+    pub fn list_scripts(&self) -> Result<Vec<String>> {
+        let scripts = self.config.toml.scripts_dir.read_dir()?;
+        let scripts = scripts
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                let path = entry.path();
+                let filename = path.file_name()?.to_str()?.to_string();
+                Some(filename)
+            })
+            .collect();
+        Ok(scripts)
+    }
+
     pub fn daily(&self) -> Result<PathBuf> {
         // TODO: add day offset to create notes for previous/next days?
         let now = chrono::Local::now();
@@ -167,5 +217,38 @@ impl Sov {
         // TODO: add template support
         std::fs::File::create(&path)?;
         Ok(path)
+    }
+
+    pub fn script_run(&self, script_name: &str, args: Vec<String>) -> Result<String> {
+        let script_path = self.config.toml.scripts_dir.join(script_name);
+        if !script_path.exists() {
+            return Err(SovError::ScriptNotFound(script_name.to_string()));
+        }
+        let output = std::process::Command::new(script_path)
+            .args(args)
+            .output()?;
+        if !output.status.success() {
+            return Err(SovError::ScriptFailed(script_name.to_string()));
+        }
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        Ok(output_str.to_string())
+    }
+
+    pub fn script_create(
+        &self,
+        note_name: &str,
+        script_name: &str,
+        args: Vec<String>,
+    ) -> Result<PathBuf> {
+        let note_path = self
+            .config
+            .toml
+            .notes_dir
+            .join(note_name)
+            .with_extension("md");
+        info!("Creating new note: {:?}", note_path);
+        let note_content = self.script_run(script_name, args)?;
+        std::fs::write(&note_path, note_content)?;
+        Ok(note_path)
     }
 }

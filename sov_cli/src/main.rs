@@ -1,5 +1,6 @@
 mod args;
 
+use args::ScriptCommand;
 use clap::Parser;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -19,6 +20,9 @@ pub fn main() -> Result<()> {
         .with_target(true)
         .finish()
         .init();
+
+    // TODO: Use the feature instead?
+    //let sov_feature = args.cmd.into();
 
     let mut sov = Sov::new()?;
     match args.cmd {
@@ -46,6 +50,12 @@ pub fn main() -> Result<()> {
                     );
                 }
             }
+            ListCommand::Scripts => {
+                let scripts = sov.list_scripts()?;
+                for script in scripts {
+                    println!("{}", script);
+                }
+            }
         },
         SovCmd::Resolve { note } => {
             let path = sov.resolve_note(&note)?;
@@ -55,6 +65,16 @@ pub fn main() -> Result<()> {
             let note = sov.daily()?;
             dbg!(note);
         }
+        SovCmd::Script { cmd } => match cmd {
+            ScriptCommand::Run { script_name, args } => {
+                let res = sov.script_run(&script_name, args)?;
+                println!("{}", res);
+            }
+            ScriptCommand::Create { note_name, script_name, args } => {
+                let note_path = sov.script_create(&note_name, &script_name, args)?;
+                println!("{:?}", note_path);
+            }
+        },
         _ => {}
     };
 

@@ -18,7 +18,7 @@ pub struct SovConfig {
 pub struct SovConfigToml {
     pub notes_dir: PathBuf,
     pub daily_notes_dir: PathBuf,
-    pub templates_dir: PathBuf,
+    pub scripts_dir: PathBuf,
     pub ignore_dirs: Vec<PathBuf>,
 }
 
@@ -74,8 +74,8 @@ impl SovConfig {
         if toml.daily_notes_dir.is_relative() {
             toml.daily_notes_dir = toml.notes_dir.join(&toml.daily_notes_dir);
         }
-        if toml.templates_dir.is_relative() {
-            toml.templates_dir = toml.notes_dir.join(&toml.templates_dir);
+        if toml.scripts_dir.is_relative() {
+            toml.scripts_dir = toml.notes_dir.join(&toml.scripts_dir);
         }
 
         Ok(Self {
