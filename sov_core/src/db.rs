@@ -284,4 +284,21 @@ impl SovDb {
         self.db.execute(sql, [])?;
         Ok(())
     }
+
+    pub fn find_notes_by_tag(&self, tag: &str) -> Result<Vec<PathBuf>> {
+        let mut stmt = self.db.prepare(
+            "SELECT n.path FROM tag t
+            JOIN tag_note tn USING(tag_id)
+            JOIN note n USING(note_id)
+            WHERE t.name = ?",
+        )?;
+        let p = params![tag];
+        let rows = stmt.query_map(p, |row| row.get(0))?;
+        let mut paths = Vec::new();
+        for row in rows {
+            let path: String = row?;
+            paths.push(PathBuf::from(path));
+        }
+        Ok(paths)
+    }
 }

@@ -46,6 +46,9 @@ pub enum SovFeature {
         path: PathBuf,
         new_filename: String,
     },
+    SearchTag {
+        tag: String,
+    },
     ScriptRun {
         script_name: String,
         args: Vec<String>,
@@ -191,6 +194,9 @@ impl Sov {
         let scripts = scripts
             .filter_map(|entry| {
                 let entry = entry.ok()?;
+                if entry.metadata().ok()?.is_dir() {
+                    return None;
+                }
                 let path = entry.path();
                 let filename = path.file_name()?.to_str()?.to_string();
                 Some(filename)
@@ -250,5 +256,10 @@ impl Sov {
         let note_content = self.script_run(script_name, args)?;
         std::fs::write(&note_path, note_content)?;
         Ok(note_path)
+    }
+
+    pub fn search_tag(&self, tag: &str) -> Result<Vec<PathBuf>> {
+        let notes = self.db.find_notes_by_tag(tag)?;
+        Ok(notes)
     }
 }

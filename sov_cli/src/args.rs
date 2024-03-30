@@ -28,6 +28,10 @@ pub enum SovCmd {
         #[command(subcommand)]
         cmd: ScriptCommand,
     },
+    Search {
+        #[command(subcommand)]
+        cmd: SearchCommand,
+    },
     Daily,
 }
 
@@ -51,6 +55,13 @@ pub enum ScriptCommand {
         note_name: String,
         script_name: String,
         args: Vec<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum SearchCommand {
+    Tag {
+        name: String
     },
 }
 
@@ -80,6 +91,9 @@ impl From<SovCmd> for SovFeature {
                     script_name,
                     args,
                 },
+            },
+            SovCmd::Search { cmd } => match cmd {
+                SearchCommand::Tag { name } => SovFeature::SearchTag { tag: name },
             },
         }
     }

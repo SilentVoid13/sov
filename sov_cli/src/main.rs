@@ -1,6 +1,6 @@
 mod args;
 
-use args::ScriptCommand;
+use args::{ScriptCommand, SearchCommand};
 use clap::Parser;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -59,7 +59,10 @@ pub fn main() -> Result<()> {
         },
         SovCmd::Resolve { note } => {
             let path = sov.resolve_note(&note)?;
-            dbg!(path);
+            let Some(path) = path else {
+                return Ok(());
+            };
+            println!("{}", path.display());
         }
         SovCmd::Daily => {
             let note = sov.daily()?;
@@ -70,9 +73,21 @@ pub fn main() -> Result<()> {
                 let res = sov.script_run(&script_name, args)?;
                 println!("{}", res);
             }
-            ScriptCommand::Create { note_name, script_name, args } => {
+            ScriptCommand::Create {
+                note_name,
+                script_name,
+                args,
+            } => {
                 let note_path = sov.script_create(&note_name, &script_name, args)?;
                 println!("{:?}", note_path);
+            }
+        },
+        SovCmd::Search { cmd } => match cmd {
+            SearchCommand::Tag { name } => {
+                let notes = sov.search_tag(&name)?;
+                for note in notes {
+                    println!("{}", note.display());
+                }
             }
         },
         _ => {}
