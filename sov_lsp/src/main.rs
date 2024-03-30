@@ -35,10 +35,7 @@ impl LanguageServer for SovLanguageServer {
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec![
-                        "sov.index".into(),
-                        "sov.daily".into(),
-                    ],
+                    commands: vec!["sov.index".into(), "sov.daily".into()],
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -242,33 +239,91 @@ impl LanguageServer for SovLanguageServer {
                 ret.push(location);
             }
             Some(ret)
-        }.await;
+        }
+        .await;
         Ok(references)
     }
 
-    async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<serde_json::Value>> {
+    async fn execute_command(
+        &self,
+        params: ExecuteCommandParams,
+    ) -> Result<Option<serde_json::Value>> {
         self.client
             .log_message(MessageType::ERROR, "execute_command triggered!")
             .await;
+
+        self.client
+            .log_message(MessageType::ERROR, format!("{:?}", params))
+            .await;
+
         let command = params.command.as_str();
-        match command {
-            "sov.index" => {
-                // TODO: remove unwrap
-                self.sov.lock().unwrap().index().unwrap();
-                Ok(None)
+        let cmd_res = async {
+            match command {
+                "sov.index" => {
+                    self.sov.lock().unwrap().index().ok()?;
+                    None
+                }
+                "sov.daily" => {
+                    // TODO: remove unwrap
+                    let daily_path = self.sov.lock().unwrap().daily().ok()?;
+                    let daily_path = daily_path.to_str()?.to_string();
+                    Some(daily_path.into())
+                }
+                "sov.list.tags" => {
+                    let tags = self.sov.lock().unwrap().list_tags().ok()?;
+                    Some(tags.into())
+                }
+                "sov.script.run" => {
+                    let script_name = params.arguments.first()?.as_str()?;
+                    let args = if params.arguments.len() > 1 {
+                        params.arguments[1..]
+                            .iter()
+                            .filter_map(|arg| Some(arg.as_str()?.to_string()))
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
+                    self.client
+                        .log_message(MessageType::ERROR, format!("name: {}", script_name))
+                        .await;
+                    self.client
+                        .log_message(MessageType::ERROR, format!("args: {:?}", args))
+                        .await;
+                    let res = self
+                        .sov
+                        .lock()
+                        .unwrap()
+                        .script_run(script_name, args)
+                        .unwrap();
+                    Some(serde_json::Value::String(res))
+                }
+                "sov.script.create" => {
+                    let note_name = params.arguments.first()?.as_str()?;
+                    let script_name = params.arguments.get(1)?.as_str()?;
+                    let args = if params.arguments.len() > 2 {
+                        params.arguments[2..]
+                            .iter()
+                            .filter_map(|arg| Some(arg.as_str()?.to_string()))
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
+                    let res = self
+                        .sov
+                        .lock()
+                        .unwrap()
+                        .script_create(note_name, script_name, args)
+                        .ok()?;
+                    Some(serde_json::Value::String(res.display().to_string()))
+                }
+                _ => None,
             }
-            "sov.daily" => {
-                // TODO: remove unwrap
-                let daily_path = self.sov.lock().unwrap().daily().unwrap();
-                let daily_path = daily_path.to_str().unwrap().to_string();
-                Ok(Some(daily_path.into()))
-            }
-            "sov.list.tags" => {
-                let tags = self.sov.lock().unwrap().list_tags().unwrap();
-                Ok(Some(tags.into()))
-            }
-            _ => Ok(None),
         }
+        .await;
+        self.client
+            .log_message(MessageType::ERROR, format!("res: {:?}", cmd_res))
+            .await;
+        Ok(cmd_res)
     }
 }
 
