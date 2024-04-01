@@ -21,7 +21,7 @@ pub enum SovCmd {
         note: String,
     },
     Rename {
-        path: PathBuf,
+        old_filename: String,
         new_filename: String,
     },
     Script {
@@ -76,7 +76,7 @@ impl From<SovCmd> for SovFeature {
                 ListCommand::Scripts => SovFeature::ListScripts,
             },
             SovCmd::Resolve { note } => SovFeature::ResolveNote { note },
-            SovCmd::Rename { path, new_filename } => SovFeature::Rename { path, new_filename },
+            SovCmd::Rename { old_filename, new_filename } => SovFeature::Rename { old_filename, new_filename },
             SovCmd::Daily => SovFeature::Daily,
             SovCmd::Script { cmd } => match cmd {
                 ScriptCommand::Run { script_name, args } => {

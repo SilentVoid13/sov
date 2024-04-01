@@ -34,6 +34,7 @@ impl LanguageServer for SovLanguageServer {
                 }),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
+                rename_provider: Some(OneOf::Left(true)),
                 execute_command_provider: Some(ExecuteCommandOptions {
                     commands: vec!["sov.index".into(), "sov.daily".into()],
                     ..Default::default()
@@ -324,6 +325,49 @@ impl LanguageServer for SovLanguageServer {
             .log_message(MessageType::ERROR, format!("res: {:?}", cmd_res))
             .await;
         Ok(cmd_res)
+    }
+
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        // HACK: to support both CLI and LSP rename, we don't fully use the workspace
+        // edit capabilities
+        let res: Option<WorkspaceEdit> = async {
+            let rope = self.document_map.get(uri.as_str())?;
+            let line = rope.get_line(position.line as usize)?;
+
+            let (old_path, old_filename) =
+                if let Some(link) = Self::link_under_cursor(&position, line.as_str()?) {
+                    let old_path = self.sov.lock().unwrap().resolve_note(&link.value).ok()??;
+                    (old_path, link.value)
+                } else {
+                    let cur_path = Self::uri_to_path(&uri).ok()?;
+                    let cur_filename = cur_path.file_stem()?.to_str()?.to_string();
+                    (cur_path, cur_filename)
+                };
+
+            let new_path = self
+                .sov
+                .lock()
+                .unwrap()
+                .rename_file(&old_filename, params.new_name.as_str(), false)
+                .ok()?;
+
+            let change_op = DocumentChangeOperation::Op(ResourceOp::Rename(RenameFile {
+                old_uri: Self::path_to_uri(&old_path).ok()?,
+                new_uri: Self::path_to_uri(&new_path).ok()?,
+                options: None,
+                annotation_id: None,
+            }));
+
+            Some(WorkspaceEdit {
+                document_changes: Some(DocumentChanges::Operations(vec![change_op])),
+                ..Default::default()
+            })
+        }
+        .await;
+        Ok(res)
     }
 }
 

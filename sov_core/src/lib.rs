@@ -4,6 +4,8 @@ pub mod error;
 pub mod note;
 
 use std::collections::HashSet;
+use std::fs::File;
+use std::io::BufReader;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 
@@ -12,6 +14,7 @@ use config::SovConfig;
 use db::SovDb;
 use error::{Result, SovError};
 use note::{Link, SovNote};
+use ropey::Rope;
 use tracing::info;
 use walkdir::WalkDir;
 
@@ -43,7 +46,7 @@ pub enum SovFeature {
         note: String,
     },
     Rename {
-        path: PathBuf,
+        old_filename: String,
         new_filename: String,
     },
     SearchTag {
@@ -261,5 +264,43 @@ impl Sov {
     pub fn search_tag(&self, tag: &str) -> Result<Vec<PathBuf>> {
         let notes = self.db.find_notes_by_tag(tag)?;
         Ok(notes)
+    }
+
+    pub fn rename_file(
+        &self,
+        old_filename: &str,
+        new_filename: &str,
+        do_rename: bool,
+    ) -> Result<PathBuf> {
+        let old_path = self
+            .resolve_note(old_filename)?
+            .ok_or(SovError::NoteNotFound(old_filename.to_string()))?;
+
+        // Rename all backlinks
+        let backlinks = self.db.get_backlinks(old_filename)?;
+        for (back_path, mut backlink) in backlinks {
+            dbg!(&back_path);
+            let reader = BufReader::new(File::open(&back_path)?);
+            let mut text = Rope::from_reader(reader)?;
+
+            text.remove(backlink.start..=backlink.end);
+            // HACK: to call .to_string, but the modified link is not fully correct
+            backlink.value = new_filename.to_string();
+            let link_str = backlink.to_string();
+            text.insert(backlink.start, &link_str);
+
+            text.write_to(&mut File::create(&back_path)?)?;
+        }
+
+        let new_path = old_path.with_file_name(new_filename).with_extension("md");
+        if do_rename {
+            // rename old to new file
+            if new_path.exists() {
+                return Err(SovError::InvalidPath(new_path));
+            }
+            std::fs::rename(&old_path, &new_path)?;
+        }
+
+        Ok(new_path)
     }
 }

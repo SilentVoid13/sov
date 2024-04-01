@@ -14,13 +14,15 @@ pub struct SovNote {
 #[derive(Debug)]
 pub struct Link {
     pub value: String,
+    pub alias: Option<String>,
+    pub header: Option<String>,
     pub start: usize,
     pub end: usize,
 }
 
+// TODO: should I make this mandatory?
 #[derive(Debug, Deserialize)]
 pub struct YamlMetadata {
-    // TODO: should I make this mandatory?
     pub aliases: Option<Vec<String>>,
     pub tags: Vec<String>,
 }
@@ -67,20 +69,26 @@ impl SovNote {
                     if let Some((_, '[')) = chars.next() {
                         let s: String = chars
                             .by_ref()
-                            .take_while(|(_, c)| *c != ']')
+                            .take_while(|(_, c)| *c != ']' && *c != '\n')
                             .map(|(_, c)| c)
                             .collect();
-                        let link = match s.split_once('|') {
-                            Some((link, _)) => link.to_string(),
-                            None => s,
-                        };
                         // TODO: should we return an error or continue?
                         let Some((end_off, ']')) = chars.next() else {
                             continue;
-                            //return Err(SovError::InvalidLink(link));
                         };
+                        let (rest, alias) = match s.split_once('|') {
+                            Some((rest, alias)) => (rest, Some(alias.to_string())),
+                            None => (s.as_str(), None),
+                        };
+                        let (link, header) = match rest.split_once('#') {
+                            Some((link, header)) => (link.to_string(), Some(header.to_string())),
+                            None => (rest.to_string(), None),
+                        };
+
                         links.push(Link {
                             value: link,
+                            alias,
+                            header,
                             start: start_off,
                             end: end_off,
                         });
@@ -91,17 +99,20 @@ impl SovNote {
         }
         Ok(links)
     }
+}
 
-    /*
-    pub fn extract_note_id(s: &str) -> Option<(String, String)> {
-        let (name, id) = s.rsplit_once(" - ")?;
-        if id.len() != 12 {
-            return None;
+impl ToString for Link {
+    fn to_string(&self) -> String {
+        let mut s = format!("[[{}", self.value);
+        match &self.header {
+            Some(header) => s.push_str(&format!("#{}", header)),
+            None => (),
         }
-        if !id.chars().all(|c| c.is_digit(10)) {
-            return None;
+        match &self.alias {
+            Some(alias) => s.push_str(&format!("|{}", alias)),
+            None => (),
         }
-        Some((id.to_string(), name.to_string()))
+        s.push_str("]]");
+        s
     }
-    */
 }

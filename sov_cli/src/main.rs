@@ -90,7 +90,10 @@ pub fn main() -> Result<()> {
                 }
             }
         },
-        _ => {}
+        SovCmd::Rename { old_filename, new_filename } => {
+            let new_path = sov.rename_file(&old_filename, &new_filename, true)?;
+            println!("Successfully renamed {} to {}", old_filename, new_path.display());
+        }
     };
 
     Ok(())

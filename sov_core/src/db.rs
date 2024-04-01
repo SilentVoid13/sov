@@ -35,7 +35,7 @@ impl SovDb {
             let mut ins_tag_note =
                 tx.prepare("INSERT INTO tag_note (tag_id, note_id) VALUES (?, ?)")?;
             let mut ins_link = tx.prepare(
-                "INSERT INTO link (src_note, link_value, start, end) VALUES (?, ?, ?, ?)",
+                "INSERT INTO link (src_note, link_value, alias, header, start, end) VALUES (?, ?, ?, ?, ?, ?)",
             )?;
 
             for note in notes {
@@ -92,7 +92,7 @@ impl SovDb {
                 }
 
                 for link in &note.links {
-                    let p = params![id, link.value, link.start, link.end,];
+                    let p = params![id, link.value, link.alias, link.header, link.start, link.end,];
                     ins_link.execute(p)?;
                 }
             }
@@ -200,7 +200,7 @@ impl SovDb {
 
     pub fn get_backlinks(&self, link_value: &str) -> Result<Vec<(PathBuf, Link)>> {
         let sql = "
-            SELECT n.path, l.link_value, l.start, l.end FROM note n
+            SELECT n.path, l.link_value, l.alias, l.header, l.start, l.end FROM note n
             JOIN link l ON n.note_id = l.src_note
             WHERE link_value = ?";
         let mut stmt = self.db.prepare(sql)?;
@@ -210,10 +210,14 @@ impl SovDb {
         while let Some(row) = rows.next()? {
             let path: String = row.get(0)?;
             let link_value: String = row.get(1)?;
-            let start: usize = row.get(2)?;
-            let end: usize = row.get(3)?;
+            let alias: Option<String> = row.get(2)?;
+            let header: Option<String> = row.get(3)?;
+            let start: usize = row.get(4)?;
+            let end: usize = row.get(5)?;
             let link = Link {
                 value: link_value,
+                alias,
+                header,
                 start,
                 end,
             };
@@ -227,16 +231,20 @@ impl SovDb {
         let Some(note_id) = self.get_note_id_by_filename(filename)? else {
             return Ok(links);
         };
-        let sql = "SELECT link_value, start, end FROM link WHERE src_note = ?";
+        let sql = "SELECT link_value, alias, header, start, end FROM link WHERE src_note = ?";
         let p = params![note_id];
         let mut stmt = self.db.prepare(sql)?;
         let mut rows = stmt.query(p)?;
         while let Some(row) = rows.next()? {
             let link_value = row.get(0)?;
-            let start = row.get(1)?;
-            let end = row.get(2)?;
+            let alias: Option<String> = row.get(1)?;
+            let header: Option<String> = row.get(2)?;
+            let start = row.get(3)?;
+            let end = row.get(4)?;
             links.push(Link {
                 value: link_value,
+                alias,
+                header,
                 start,
                 end,
             });
@@ -250,7 +258,7 @@ impl SovDb {
             return Ok(links);
         };
         let sql = "
-            SELECT link_value, start, end FROM link
+            SELECT link_value, alias, header, start, end FROM link
             WHERE src_note = ? AND link_value NOT IN (
                 SELECT filename FROM note
             )";
@@ -260,10 +268,14 @@ impl SovDb {
         let mut rows = stmt.query(p)?;
         while let Some(row) = rows.next()? {
             let link_value = row.get(0)?;
-            let start = row.get(1)?;
-            let end = row.get(2)?;
+            let alias: Option<String> = row.get(1)?;
+            let header: Option<String> = row.get(2)?;
+            let start = row.get(3)?;
+            let end = row.get(4)?;
             links.push(Link {
                 value: link_value,
+                alias,
+                header,
                 start,
                 end,
             });
@@ -272,7 +284,9 @@ impl SovDb {
     }
 
     pub fn delete_note_by_path(&self, path: &Path) -> Result<()> {
-        let path = path.to_str().ok_or(SovError::InvalidPath(path.to_path_buf()))?;
+        let path = path
+            .to_str()
+            .ok_or(SovError::InvalidPath(path.to_path_buf()))?;
         let sql = "DELETE FROM note WHERE path = ?";
         let p = params![path];
         self.db.execute(sql, p)?;

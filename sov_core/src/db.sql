@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS link (
     link_id INTEGER PRIMARY KEY AUTOINCREMENT,
     src_note TEXT NOT NULL REFERENCES note(note_id),
     link_value TEXT NOT NULL,
+    alias TEXT,
+    header TEXT,
     start INTEGER NOT NULL,
     end INTEGER NOT NULL
 );
