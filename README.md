@@ -48,7 +48,7 @@ SyncDisBoi is licensed under the GNU AGPLv3 license. Refer to [LICENSE](LICENSE.
 
 ## Support
 
-Your support helps me continue to maintain and improve this project. If you find SyncDisBoi useful and want to show your appreciation, consider sponsoring or donating:
+Your support helps me continue to maintain and improve this project. If you find sov useful and want to show your appreciation, consider sponsoring or donating:
 - GitHub Sponsors: Preferred method. You can sponsor me on [GitHub Sponsors](https://github.com/sponsors/SilentVoid13). 
 - PayPal: You can also make a donation via [PayPal](https://www.paypal.com/donate?hosted_button_id=U2SRGAFYXT32Q).
 

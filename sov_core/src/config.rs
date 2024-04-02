@@ -18,6 +18,7 @@ pub struct SovConfig {
 pub struct SovConfigToml {
     pub notes_dir: PathBuf,
     pub daily_notes_dir: PathBuf,
+    pub daily_notes_script: String,
     pub scripts_dir: PathBuf,
     pub ignore_dirs: Vec<PathBuf>,
 }

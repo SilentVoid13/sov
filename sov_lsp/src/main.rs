@@ -253,10 +253,6 @@ impl LanguageServer for SovLanguageServer {
             .log_message(MessageType::ERROR, "execute_command triggered!")
             .await;
 
-        self.client
-            .log_message(MessageType::ERROR, format!("{:?}", params))
-            .await;
-
         let command = params.command.as_str();
         let cmd_res = async {
             match command {
@@ -284,19 +280,13 @@ impl LanguageServer for SovLanguageServer {
                     } else {
                         Vec::new()
                     };
-                    self.client
-                        .log_message(MessageType::ERROR, format!("name: {}", script_name))
-                        .await;
-                    self.client
-                        .log_message(MessageType::ERROR, format!("args: {:?}", args))
-                        .await;
                     let res = self
                         .sov
                         .lock()
                         .unwrap()
                         .script_run(script_name, args)
                         .unwrap();
-                    Some(serde_json::Value::String(res))
+                    Some(res.into())
                 }
                 "sov.script.create" => {
                     let note_name = params.arguments.first()?.as_str()?;
@@ -315,7 +305,7 @@ impl LanguageServer for SovLanguageServer {
                         .unwrap()
                         .script_create(note_name, script_name, args)
                         .ok()?;
-                    Some(serde_json::Value::String(res.display().to_string()))
+                    Some(res.to_str().into())
                 }
                 _ => None,
             }

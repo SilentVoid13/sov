@@ -213,6 +213,8 @@ impl Sov {
         let now = chrono::Local::now();
         // TODO: add support for custom date format
         let date = now.format("%Y-%m-%d").to_string();
+
+        // if note already exists
         if let Some(path) = self.db.get_note_by_filename(&date)? {
             return Ok(path);
         }
@@ -223,8 +225,12 @@ impl Sov {
             .join(&date)
             .with_extension("md");
         info!("Creating new daily note: {:?}", path);
-        // TODO: add template support
-        std::fs::File::create(&path)?;
+        if !self.config.toml.daily_notes_script.is_empty() {
+            let content = self.script_run(&self.config.toml.daily_notes_script, vec![])?;
+            std::fs::write(&path, content)?;
+        } else {
+            std::fs::File::create(&path)?;
+        }
         Ok(path)
     }
 
