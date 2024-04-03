@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use clap::{Parser, Subcommand};
 use sov_core::SovFeature;
 
@@ -8,6 +6,8 @@ use sov_core::SovFeature;
 pub struct SovArgs {
     #[command(subcommand)]
     pub cmd: SovCmd,
+    #[arg(short, long)]
+    pub silent: bool,
 }
 
 #[derive(Subcommand, Debug)]

@@ -14,12 +14,14 @@ pub fn main() -> Result<()> {
     color_eyre::install()?;
     let args = SovArgs::parse();
 
-    // Setup logging
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .with_target(true)
-        .finish()
-        .init();
+    if !args.silent {
+        // Setup logging
+        tracing_subscriber::fmt()
+            .with_max_level(Level::INFO)
+            .with_target(true)
+            .finish()
+            .init();
+    }
 
     // TODO: Use the feature instead?
     //let sov_feature = args.cmd.into();
