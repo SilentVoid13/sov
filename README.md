@@ -2,19 +2,23 @@
 
 sov is a text-editor agnostic tool to help you manage your personal knowledge notes.
 
-Why all-in on a specific editor? The philosophy behind sov is to provide a set of basic features to help you manage your notes either through a CLI or an LSP, to then let you pick your editor of choice to write/edit/view your notes: Neovim, VSCode, Zed, ...
+Why all-in on a specific editor? The philosophy behind sov is to provide a set of basic features to help you manage your notes either through a CLI or an LSP. You can then use your editor of choice to write/edit/view your notes: Neovim, VSCode, Zed, ...
 
 > **Disclaimer**: sov was primarily designed for my personal usage. I want to keep this tool as simple and as straight to the point as possible with no extra-bloat features. If it suits you as well that's great, otherwise you can check other alternatives listed below.
 
 ## Plaintext format requirements
 
 Your plaintext notes have to respect a certain format for sov to work.
-The idea is to make these requirements as less constraining as possible to let you build a customized system that suits you.
+The idea is to make these requirements as less constraining as possible to let you build your own customized system.
 
 The requirements are:
 - Your notes are markdown files
 - Wiki-links are used to link notes (e.g. `[[MyNote]]`)
+    - Linking to a header is supported (e.g. `[[MyNote#MyHeader]]`)
+    - Aliases are supported (e.g. `[[MyNote|MyNoteAlias]]`)
 - YAML metadata is located at the top of the file enclosed by three dashes (`---`)
+    - The `aliases` key is used to set aliases for the note
+    - The `tags` key is used to set tags for the note
 
 This format is fully compatible with Obsidian.
 
@@ -22,25 +26,25 @@ This format is fully compatible with Obsidian.
 
 sov currently offers the following features:
 - List
-    - Dead links
-    - Orphan notes
     - Tags
+    - Dead links: notes that are linked to, but do not exist
+    - Orphan notes: notes that are not linked to any other note
 - Search
-    - Notes with tag
+    - All notes with a specific tag
 - Resolve note link
 - Rename note and update all backlinks
 - Create/Open daily note
 
 ## Config
 
-sov configuration file is located at `~/.config/sov/sov.toml`:
+The sov configuration file is located at `~/.config/sov/sov.toml`:
 
 ```toml
-# Directory constraining your personal knowledge notes
+# Root directory for your personal knowledge notes
 notes_dir = "<personal_knowledge_dir>"
-# Directory to search for scripts
+# Directory for scripts
 scripts_dir = "<scripts_dir>"
-# Directory to use for new daily notes
+# Directory for new daily notes
 daily_notes_dir = "<daily_notes_dir>"
 # Script to use for new daily note content
 daily_notes_script = ""
@@ -77,6 +81,8 @@ Options:
 
 - [sov.nvim](https://github.com/SilentVoid13/sov.nvim): an implementation of the LSP for Neovim
 
+Feel free to contribute and develop the LSP implementation for your favorite editor.
+
 ## Alternatives
 
 - https://github.com/zk-org/zk
@@ -89,7 +95,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for det
 
 ## License
 
-SyncDisBoi is licensed under the GNU AGPLv3 license. Refer to [LICENSE](LICENSE.txt) for more information.
+sov is licensed under the GNU AGPLv3 license. Refer to [LICENSE](LICENSE.txt) for more information.
 
 ## Support
 
