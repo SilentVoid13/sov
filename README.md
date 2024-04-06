@@ -2,7 +2,7 @@
 
 sov is a text-editor agnostic tool to help you manage your personal knowledge notes.
 
-Why all-in on a specific editor? The philosophy behind sov is to provide a set of features to manage your notes and then letting you pick your editor of choice for writing/editing/viewing your notes: NeoVim, VSCode, Zed, ...
+Why all-in on a specific editor? The philosophy behind sov is to provide a set of basic features to help you manage your notes either through a CLI or an LSP, to then let you pick your editor of choice to write/edit/view your notes: Neovim, VSCode, Zed, ...
 
 > **Disclaimer**: sov was primarily designed for my personal usage. I want to keep this tool as simple and as straight to the point as possible with no extra-bloat features. If it suits you as well that's great, otherwise you can check other alternatives listed below.
 
@@ -12,25 +12,70 @@ Your plaintext notes have to respect a certain format for sov to work.
 The idea is to make these requirements as less constraining as possible to let you build a customized system that suits you.
 
 The requirements are:
-- Wiki-links format for linking notes (e.g. `[[MyNote]]`)
+- Your notes are markdown files
+- Wiki-links are used to link notes (e.g. `[[MyNote]]`)
 - YAML metadata is located at the top of the file enclosed by three dashes (`---`)
-- Headings start with one or more `#` at the start of a line (e.g. `## MyHeader`)
-- Tags start with a `#` and contain no space (e.g. `#mytag`)
 
 This format is fully compatible with Obsidian.
 
 ## Features
 
-sov currently supports the following features:
+sov currently offers the following features:
+- List
+    - Dead links
+    - Orphan notes
+    - Tags
+- Search
+    - Notes with tag
 - Resolve note link
-- List dead links
-- List tags
-- List orphan notes
+- Rename note and update all backlinks
 - Create/Open daily note
+
+## Config
+
+sov configuration file is located at `~/.config/sov/sov.toml`:
+
+```toml
+# Directory constraining your personal knowledge notes
+notes_dir = "<personal_knowledge_dir>"
+# Directory to search for scripts
+scripts_dir = "<scripts_dir>"
+# Directory to use for new daily notes
+daily_notes_dir = "<daily_notes_dir>"
+# Script to use for new daily note content
+daily_notes_script = ""
+# List of directories that will be ignored by sov
+ignore_dirs = []
+```
 
 ## Usage
 
 sov features are provided through a CLI and a Language Server.
+
+### CLI
+
+```txt
+Usage: sov [OPTIONS] <COMMAND>
+
+Commands:
+  index
+  list
+  resolve
+  rename
+  script
+  search
+  daily
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -s, --silent
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+### LSP
+
+- [sov.nvim](https://github.com/SilentVoid13/sov.nvim): an implementation of the LSP for Neovim
 
 ## Alternatives
 
