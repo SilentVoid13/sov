@@ -11,13 +11,11 @@
   };
 
   outputs = {
-    self,
     nixpkgs,
     flake-utils,
     flakebox,
     ...
-  } @ inputs: let
-  in
+  }:
     flake-utils.lib.eachDefaultSystem (
       system: let
         pkgs = import nixpkgs {inherit system;};
@@ -44,9 +42,10 @@
         buildPaths = [
           "Cargo.toml"
           "Cargo.lock"
+          ".cargo"
           "sov"
           "sov_cli"
-          ".cargo"
+          "sov_lsp"
         ];
 
         buildInputs = with pkgs; [
@@ -71,7 +70,7 @@
             src = buildSrc;
             inherit buildInputs nativeBuildInputs;
           };
-        in rec {
+        in {
           ${project_name} = craneLib.buildPackage {};
         });
       in {
