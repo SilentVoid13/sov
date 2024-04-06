@@ -2,7 +2,7 @@
 
 sov is a text-editor agnostic tool to help you manage your personal knowledge notes.
 
-Why all-in on a specific note-taking tool? The philosophy behind sov is to provide a set of basic features to help you manage your notes either through a CLI or an LSP. You can then use your editor of choice to write/edit/view your notes: Neovim, VSCode, Zed, ...
+Why all-in on a specific note-taking tool? The philosophy behind sov is to provide a set of basic features to help you manage your notes either through a CLI or a Language Server. You can then use your editor of choice to write/edit/view your notes: Neovim, VSCode, Zed, ...
 
 > **Disclaimer**: sov was primarily designed for my personal usage. I want to keep this tool as simple and as straight to the point as possible with no extra-bloat features. If it suits you as well that's great, otherwise you can check other alternatives listed below.
 
@@ -77,11 +77,11 @@ Options:
   -V, --version  Print version
 ```
 
-### LSP
+### Language Server
 
-- [sov.nvim](https://github.com/SilentVoid13/sov.nvim): an implementation of the LSP for Neovim
+- [sov.nvim](https://github.com/SilentVoid13/sov.nvim): an integration of the Language Server for Neovim
 
-Feel free to contribute and develop the LSP implementation for your favorite editor.
+Feel free to contribute and develop a Language Server integration for your favorite editor.
 
 ## Alternatives
 
